@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.floating-scroll" path="/org/gnome/shell/extensions/floating-scroll/">
+    <key name="overridden-settings" type="a{sv}">
+      <description>Private key for remembering the overridden values</description>
+      <default>[]</default>
+    </key>
+    <key name="focus-left" type="as">
+      <default><![CDATA[['<Super>Left','<Alt><Super>Left']]]></default>
+    </key>
+    <key name="focus-right" type="as">
+      <default><![CDATA[['<Super>Right','<Alt><Super>Right']]]></default>
+    </key>
+    <key name="move-left" type="as">
+      <default><![CDATA[['<Shift><Alt><Super>Left','<Shift><Super>Left']]]></default>
+    </key>
+    <key name="move-right" type="as">
+      <default><![CDATA[['<Shift><Alt><Super>Right','<Shift><Super>Right']]]></default>
+    </key>
+    <key name="shift-up" type="as">
+      <default><![CDATA[['<Super>Up']]]></default>
+    </key>
+    <key name="shift-down" type="as">
+      <default><![CDATA[['<Super>Down']]]></default>
+    </key>
+  </schema>
+</schemalist>

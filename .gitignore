@@ -1,0 +1,9 @@
+*~
+*.compiled
+*.gresource
+*.zip
+build/
+locale/
+node_modules/
+floating-scroll@extensions.leleat/
+TODO*

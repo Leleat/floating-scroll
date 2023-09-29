@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<gresources>
+    <gresource prefix="/floating-scroll">
+        <file>enter-keyboard-shortcut.svg</file>
+    </gresource>
+</gresources>

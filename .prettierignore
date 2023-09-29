@@ -1,0 +1,4 @@
+@types/gi/**
+tsconfig.json
+TODO*
+*.yml

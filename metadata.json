@@ -1,0 +1,7 @@
+{
+    "name": "Floating Scroll",
+    "description": "...",
+    "uuid": "floating-scroll@extensions.leleat",
+    "shell-version": ["45"],
+    "settings-schema": "org.gnome.shell.extensions.floating-scroll"
+}

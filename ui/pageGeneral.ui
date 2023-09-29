@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface domain="floating-scroll@extensions.leleat">
+  <object class="AdwPreferencesPage" id="page-general">
+    <child>
+      <object class="AdwPreferencesGroup">
+        <child>
+          <object class="FsShortcutRow" id="focus-left">
+            <property name="title" translatable="yes">Move Focus Left</property>
+          </object>
+        </child>
+        <child>
+          <object class="FsShortcutRow" id="focus-right">
+            <property name="title" translatable="yes">Move Focus Right</property>
+          </object>
+        </child>
+        <child>
+          <object class="FsShortcutRow" id="move-left">
+            <property name="title" translatable="yes">Move Window Left</property>
+          </object>
+        </child>
+        <child>
+          <object class="FsShortcutRow" id="move-right">
+            <property name="title" translatable="yes">Move Window Right</property>
+          </object>
+        </child>
+        <child>
+          <object class="FsShortcutRow" id="shift-up">
+            <property name="title" translatable="yes">Shift Up</property>
+            <property name="subtitle" translatable="yes">Floating &gt; Maximized (vertically) &gt; Maximize (fully)</property>
+          </object>
+        </child>
+        <child>
+          <object class="FsShortcutRow" id="shift-down">
+            <property name="title" translatable="yes">Shift Down</property>
+            <property name="subtitle" translatable="yes">Maxmized &gt; Floating &gt; Sticky</property>
+          </object>
+        </child>
+      </object>
+    </child>
+  </object>
+</interface>

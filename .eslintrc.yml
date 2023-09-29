@@ -1,0 +1,45 @@
+extends:
+  - ./lint/eslintrc-gjs.yml
+  - ./lint/eslintrc-shell.yml
+  - plugin:@typescript-eslint/recommended
+  - plugin:prettier/recommended
+parser: '@typescript-eslint/parser'
+parserOptions:
+  sourceType: module
+plugins:
+  - '@typescript-eslint'
+root: true
+overrides:
+  - files: '**/*.ts'
+    rules:
+      # This rule may not make that much sense for an extension since we often
+      # need to inject a function into existing objects.
+      '@typescript-eslint/no-this-alias':
+        - error
+        - allowedNames:
+            - _this
+      # So that prettier doesn't inline one-liner ifs
+      curly:
+        - error
+        - all
+      # Disable JSDoc since we now use TypeScript
+      jsdoc/check-alignment: off
+      jsdoc/check-param-names: off
+      jsdoc/check-tag-names: off
+      jsdoc/check-types: off
+      jsdoc/implements-on-classes: off
+      jsdoc/tag-lines: off
+      jsdoc/require-jsdoc: off
+      jsdoc/require-param: off
+      jsdoc/require-param-description: off
+      jsdoc/require-param-name: off
+      jsdoc/require-param-type: off
+      # replace JSDoc's version
+      no-invalid-this: off
+      '@typescript-eslint/no-invalid-this': error
+      # replace JSDoc's version
+      no-shadow: off
+      '@typescript-eslint/no-shadow': error
+      # replace JSDoc's version
+      no-useless-constructor: off
+      '@typescript-eslint/no-useless-constructor': error

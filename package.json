@@ -1,0 +1,25 @@
+{
+    "name": "floating-scroll",
+    "version": "1.0.0",
+    "description": "...",
+    "main": "src/extension.ts",
+    "scripts": {
+        "lint": "npx eslint src --ext .ts",
+        "dev": "bash scripts/build.sh && npx tsc --watch"
+    },
+    "keywords": [],
+    "author": "Leleat",
+    "license": "GPL-2.0-or-later",
+    "type": "module",
+    "dependencies": {
+        "@ts-for-gir/cli": "^3.2.0",
+        "@typescript-eslint/eslint-plugin": "^6.5.0",
+        "@typescript-eslint/parser": "^6.5.0",
+        "eslint": "^8.48.0",
+        "eslint-config-prettier": "^9.0.0",
+        "eslint-plugin-jsdoc": "^46.6.0",
+        "eslint-plugin-prettier": "^5.0.0",
+        "prettier": "^3.0.3",
+        "typescript": "^5.2.2"
+    }
+}
