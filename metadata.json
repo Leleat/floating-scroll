@@ -1,0 +1,10 @@
+{
+  "name": "Floating Scroll",
+  "description": "A scrolling floating window manager",
+  "version-name": "0.1.0",
+  "url": "https://github.com/Leleat/floating-scroll",
+  "uuid": "floating-scroll@extensions.leleat",
+  "gettext-domain": "floating-scroll@extensions.leleat",
+  "settings-schema": "org.gnome.shell.extensions.floating-scroll",
+  "shell-version": ["47"]
+}
