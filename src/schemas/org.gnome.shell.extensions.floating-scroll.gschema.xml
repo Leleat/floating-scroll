@@ -9,5 +9,100 @@
             <default>[]</default>
             <summary>Private key: Saves the overridden native settings</summary>
         </key>
+
+        <key name="multi-stage-shortcut-activator-0" type="as">
+            <default>[]</default>
+        </key>
+        <key name="multi-stage-shortcut-activator-1" type="as">
+            <default>[]</default>
+        </key>
+        <key name="multi-stage-shortcut-activator-2" type="as">
+            <default>[]</default>
+        </key>
+        <key name="multi-stage-shortcut-activator-3" type="as">
+            <default>[]</default>
+        </key>
+        <key name="multi-stage-shortcut-activator-4" type="as">
+            <default>[]</default>
+        </key>
+        <key name="multi-stage-shortcut-activator-5" type="as">
+            <default>[]</default>
+        </key>
+        <key name="multi-stage-shortcut-activator-6" type="as">
+            <default>[]</default>
+        </key>
+        <key name="multi-stage-shortcut-activator-7" type="as">
+            <default>[]</default>
+        </key>
+        <key name="multi-stage-shortcut-activator-8" type="as">
+            <default>[]</default>
+        </key>
+        <key name="multi-stage-shortcut-activator-9" type="as">
+            <default>[]</default>
+        </key>
+        <key name="multi-stage-shortcut-activator-10" type="as">
+            <default>[]</default>
+        </key>
+        <key name="multi-stage-shortcut-activator-11" type="as">
+            <default>[]</default>
+        </key>
+        <key name="multi-stage-shortcut-activator-12" type="as">
+            <default>[]</default>
+        </key>
+        <key name="multi-stage-shortcut-activator-13" type="as">
+            <default>[]</default>
+        </key>
+        <key name="multi-stage-shortcut-activator-14" type="as">
+            <default>[]</default>
+        </key>
+        <key name="multi-stage-shortcut-activator-15" type="as">
+            <default>[]</default>
+        </key>
+        <key name="multi-stage-shortcut-activator-16" type="as">
+            <default>[]</default>
+        </key>
+        <key name="multi-stage-shortcut-activator-17" type="as">
+            <default>[]</default>
+        </key>
+        <key name="multi-stage-shortcut-activator-18" type="as">
+            <default>[]</default>
+        </key>
+        <key name="multi-stage-shortcut-activator-19" type="as">
+            <default>[]</default>
+        </key>
+        <key name="multi-stage-shortcut-activator-20" type="as">
+            <default>[]</default>
+        </key>
+        <key name="multi-stage-shortcut-activator-21" type="as">
+            <default>[]</default>
+        </key>
+        <key name="multi-stage-shortcut-activator-22" type="as">
+            <default>[]</default>
+        </key>
+        <key name="multi-stage-shortcut-activator-23" type="as">
+            <default>[]</default>
+        </key>
+        <key name="multi-stage-shortcut-activator-24" type="as">
+            <default>[]</default>
+        </key>
+        <key name="multi-stage-shortcut-activator-25" type="as">
+            <default>[]</default>
+        </key>
+        <key name="multi-stage-shortcut-activator-26" type="as">
+            <default>[]</default>
+        </key>
+        <key name="multi-stage-shortcut-activator-27" type="as">
+            <default>[]</default>
+        </key>
+        <key name="multi-stage-shortcut-activator-28" type="as">
+            <default>[]</default>
+        </key>
+        <key name="multi-stage-shortcut-activator-29" type="as">
+            <default>[]</default>
+        </key>
+
+        <!--                               -->
+        <!-- Public keys for user settings -->
+        <!--                               -->
     </schema>
 </schemalist>

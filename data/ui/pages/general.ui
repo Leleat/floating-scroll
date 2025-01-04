@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface domain="floating-scroll@extensions.leleat">
+  <object class="AdwPreferencesPage" id="general">
+    <property name="title" translatable="yes">General</property>
+    <property name="icon-name">view-app-grid-symbolic</property>
+  </object>
+</interface>
