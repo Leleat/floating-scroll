@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist>
     <schema id="org.gnome.shell.extensions.floating-scroll" path="/org/gnome/shell/extensions/floating-scroll/">
+        <!--                               -->
+        <!-- Private keys for internal use -->
+        <!--                               -->
+
+        <key name="overridden-settings" type="a{sv}">
+            <default>[]</default>
+            <summary>Private key: Saves the overridden native settings</summary>
+        </key>
     </schema>
 </schemalist>
