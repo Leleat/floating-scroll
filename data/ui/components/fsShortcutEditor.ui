@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface domain="floating-scroll@extensions.leleat">
+  <template class="FsShortcutEditor" parent="AdwWindow">
+    <property name="default-width">500</property>
+    <property name="default-height">400</property>
+    <property name="modal">1</property>
+    <property name="resizable">False</property>
+    <child>
+      <object class="GtkEventControllerKey">
+        <property name="propagation-phase">capture</property>
+        <signal name="key-pressed" handler="on_event_controller_key_pressed" />
+      </object>
+    </child>
+    <property name="content">
+      <object class="AdwToolbarView">
+        <child type="top">
+          <object class="AdwHeaderBar">
+          </object>
+        </child>
+        <property name="content">
+          <object class="GtkBox">
+            <property name="orientation">vertical</property>
+            <property name="margin-start">36</property>
+            <property name="margin-end">36</property>
+            <property name="spacing">6</property>
+            <property name="halign">fill</property>
+            <property name="valign">fill</property>
+            <child>
+              <object class="GtkPicture">
+                <property name="halign">center</property>
+                <property name="valign">center</property>
+                <property name="can-shrink">False</property>
+                <property name="margin-top">18</property>
+                <property name="margin-bottom">18</property>
+                <property name="file">resource:///svg/enter-keyboard-shortcut.svg</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkBox">
+                <property name="halign">center</property>
+                <child>
+                  <object class="GtkLabel">
+                    <property name="label">Enter a new shortcut.</property>
+                  </object>
+                </child>
+              </object>
+            </child>
+            <child>
+              <object class="GtkLabel">
+                <property name="label">Press &lt;b&gt;&lt;tt&gt;Esc&lt;/tt&gt;&lt;/b&gt; to cancel or &lt;b&gt;&lt;tt&gt;Backspace&lt;/tt&gt;&lt;/b&gt; to disable the shortcut.</property>
+                <property name="use-markup">1</property>
+                <style>
+                  <class name="dim-label" />
+                </style>
+              </object>
+            </child>
+            <child>
+              <object class="GtkLabel" id="preview-new-shortcut-label">
+                <property name="margin-top">36</property>
+                <property name="margin-bottom">36</property>
+                <property name="use-markup">1</property>
+                <property name="ellipsize">start</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkButton" id="apply-button">
+                <property name="halign">center</property>
+                <property name="margin-bottom">18</property>
+                <property name="label" translatable="yes">Apply</property>
+                <property name="can-focus">0</property>
+                <property name="sensitive">0</property>
+                <signal name="clicked" handler="on_apply_button_clicked" />
+                <style>
+                  <class name="pill" />
+                  <class name="suggested-action" />
+                </style>
+              </object>
+            </child>
+          </object>
+        </property>
+      </object>
+    </property>
+  </template>
+</interface>

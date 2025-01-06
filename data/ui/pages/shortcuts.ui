@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface domain="floating-scroll@extensions.leleat">
+  <object class="AdwPreferencesPage" id="shortcuts">
+    <property name="title" translatable="yes">Shortcuts</property>
+    <property name="icon-name">preferences-desktop-keyboard-symbolic</property>
+  </object>
+</interface>

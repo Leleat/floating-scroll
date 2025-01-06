@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface domain="floating-scroll@extensions.leleat">
+  <template class="FsShortcutRow" parent="AdwActionRow">
+    <property name="activatable">True</property>
+    <property name="title-lines">1</property>
+    <child>
+      <object class="GtkLabel" id="label">
+        <property name="margin-start">24</property>
+        <property name="ellipsize">middle</property>
+        <property name="has-tooltip">True</property>
+      </object>
+    </child>
+    <child>
+      <object class="GtkButton" id="clear-button">
+        <property name="focus-on-click">0</property>
+        <property name="valign">center</property>
+        <property name="icon-name">edit-clear-symbolic</property>
+        <property name="tooltip-text" translatable="yes">Clear shortcut</property>
+        <signal name="clicked" handler="on_clear_button_clicked" />
+        <style>
+          <class name="flat" />
+          <class name="circular" />
+          <class name="reset-shortcut-button" />
+        </style>
+      </object>
+    </child>
+  </template>
+</interface>
