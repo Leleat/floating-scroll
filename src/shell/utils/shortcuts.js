@@ -31,10 +31,10 @@ const UNKNOWN_ERROR_STATUS_LABEL = "Unknown error...";
 
 class Shortcuts {
     /** @type {string[]} */
-    _registeredShortcuts = [];
+    #registeredShortcuts = [];
 
     /** @type {MultiStageShortcutManager} */
-    _multiStageShortcutManager = new MultiStageShortcutManager();
+    #multiStageShortcutManager = new MultiStageShortcutManager();
 
     constructor() {
         updateMultiStageShortcutActivators(Settings.getGioObject());
@@ -43,13 +43,13 @@ class Shortcuts {
     destroy() {
         Settings.unwatch(this);
 
-        this._registeredShortcuts.forEach((shortcut) =>
+        this.#registeredShortcuts.forEach((shortcut) =>
             Main.wm.removeKeybinding(shortcut),
         );
-        this._registeredShortcuts = [];
+        this.#registeredShortcuts = [];
 
-        this._multiStageShortcutManager.destroy();
-        this._multiStageShortcutManager = null;
+        this.#multiStageShortcutManager.destroy();
+        this.#multiStageShortcutManager = null;
     }
 
     /**
@@ -66,27 +66,27 @@ class Shortcuts {
         flags = Meta.KeyBindingFlags.IGNORE_AUTOREPEAT,
         modes = Shell.ActionMode.NORMAL,
     }) {
-        if (this._registeredShortcuts.includes(key)) {
+        if (this.#registeredShortcuts.includes(key)) {
             throw new Error(`Shortcut "${key}" is already registered.`);
         }
 
-        this._watchShortcutTypeChange(key, handler, flags, modes);
+        this.#watchShortcutTypeChange(key, handler, flags, modes);
 
-        if (this._isMultiStageShortcut(key)) {
-            this._multiStageShortcutManager.register(key, handler);
+        if (this.#isMultiStageShortcut(key)) {
+            this.#multiStageShortcutManager.register(key, handler);
 
             return;
         }
 
         let shortcutAddedSuccessfully = false;
 
-        if (this._isMultiStageShortcutPrimaryActivator(key)) {
+        if (this.#isMultiStageShortcutPrimaryActivator(key)) {
             shortcutAddedSuccessfully = Main.wm.addKeybinding(
                 key,
                 Settings.getGioObject(),
                 flags,
                 modes,
-                () => this._multiStageShortcutManager.start(key),
+                () => this.#multiStageShortcutManager.start(key),
             );
         } else {
             shortcutAddedSuccessfully = Main.wm.addKeybinding(
@@ -99,18 +99,18 @@ class Shortcuts {
         }
 
         if (shortcutAddedSuccessfully) {
-            this._registeredShortcuts.push(key);
+            this.#registeredShortcuts.push(key);
         }
     }
 
-    _isMultiStageShortcut(key) {
+    #isMultiStageShortcut(key) {
         return (
             Settings.getGioObject().get_strv(key).length > 1 &&
-            !this._isMultiStageShortcutPrimaryActivator(key)
+            !this.#isMultiStageShortcutPrimaryActivator(key)
         );
     }
 
-    _isMultiStageShortcutPrimaryActivator(key) {
+    #isMultiStageShortcutPrimaryActivator(key) {
         return key.match(/^multi-stage-shortcut-activator-\d+$/);
     }
 
@@ -120,8 +120,8 @@ class Shortcuts {
      * @param {Meta.KeyBindingFlags} flags
      * @param {Shell.ActionMode} modes
      */
-    _watchShortcutTypeChange(key, handler, flags, modes) {
-        if (this._isMultiStageShortcutPrimaryActivator(key)) {
+    #watchShortcutTypeChange(key, handler, flags, modes) {
+        if (this.#isMultiStageShortcutPrimaryActivator(key)) {
             return;
         }
 
@@ -138,24 +138,24 @@ class Shortcuts {
                 // shortcut changes as well.
 
                 const multiStageToSingle =
-                    this._multiStageShortcutManager.isRegistered(key) &&
-                    !this._isMultiStageShortcut(key);
+                    this.#multiStageShortcutManager.isRegistered(key) &&
+                    !this.#isMultiStageShortcut(key);
                 const singleToMultiStage =
-                    !this._multiStageShortcutManager.isRegistered(key) &&
-                    this._isMultiStageShortcut(key);
+                    !this.#multiStageShortcutManager.isRegistered(key) &&
+                    this.#isMultiStageShortcut(key);
 
                 if (multiStageToSingle) {
                     Settings.unwatch(id);
 
-                    this._multiStageShortcutManager.unregister(key);
+                    this.#multiStageShortcutManager.unregister(key);
 
                     this.register({ key, handler, flags, modes });
                 } else if (singleToMultiStage) {
                     Settings.unwatch(id);
 
                     Main.wm.removeKeybinding(key);
-                    this._registeredShortcuts =
-                        this._registeredShortcuts.filter(
+                    this.#registeredShortcuts =
+                        this.#registeredShortcuts.filter(
                             (shortcut) => shortcut !== key,
                         );
 
@@ -173,15 +173,15 @@ class MultiStageShortcutManager extends Clutter.Actor {
     }
 
     /** @type {Clutter.GrabState|null} */
-    _grab = null;
+    #grab = null;
 
     /** @type {Map<string, Function}>} */
-    _handlers = new Map();
+    #handlers = new Map();
 
     /** @type {{primaryActivator: string, secondaryActivators: string[], handler: Function}[]} */
-    _matchingMultiStageShortcuts = [];
+    #matchingMultiStageShortcuts = [];
 
-    _statusLabel = new St.Label({
+    #statusLabel = new St.Label({
         opacity: 127,
         y_align: Clutter.ActorAlign.CENTER,
         visible: false,
@@ -190,18 +190,18 @@ class MultiStageShortcutManager extends Clutter.Actor {
     constructor() {
         super({ reactive: true, visible: false });
 
-        Main.panel._leftBox.add_child(this._statusLabel);
+        Main.panel._leftBox.add_child(this.#statusLabel);
         global.stage.add_child(this);
     }
 
     destroy() {
-        this._finish();
+        this.#finish();
 
-        this._handlers = null;
-        this._matchingMultiStageShortcuts = null;
+        this.#handlers = null;
+        this.#matchingMultiStageShortcuts = null;
 
-        this._statusLabel.destroy();
-        this._statusLabel = null;
+        this.#statusLabel.destroy();
+        this.#statusLabel = null;
 
         super.destroy();
     }
@@ -209,10 +209,10 @@ class MultiStageShortcutManager extends Clutter.Actor {
     start(shortcutKey) {
         this.show();
 
-        this._grab = Main.pushModal(this);
+        this.#grab = Main.pushModal(this);
 
-        if ((this._grab.get_seat_state() & Clutter.GrabState.KEYBOARD) === 0) {
-            this._finish(UNKNOWN_ERROR_STATUS_LABEL);
+        if ((this.#grab.get_seat_state() & Clutter.GrabState.KEYBOARD) === 0) {
+            this.#finish(UNKNOWN_ERROR_STATUS_LABEL);
 
             return;
         }
@@ -222,19 +222,19 @@ class MultiStageShortcutManager extends Clutter.Actor {
             this._statusLabelHideTimer = 0;
         }
 
-        this._statusLabel.show();
-        this._statusLabel.text = WAITING_FOR_NEXT_KEY_STATUS_LABEL;
+        this.#statusLabel.show();
+        this.#statusLabel.text = WAITING_FOR_NEXT_KEY_STATUS_LABEL;
 
-        this._matchingMultiStageShortcuts = [];
+        this.#matchingMultiStageShortcuts = [];
 
         const [activator] = Settings.getGioObject().get_strv(shortcutKey);
 
-        this._handlers.forEach((handler, scKey) => {
+        this.#handlers.forEach((handler, scKey) => {
             const [shortcutActivator, ...secondaryActivators] =
                 Settings.getGioObject().get_strv(scKey);
 
             if (shortcutActivator === activator) {
-                this._matchingMultiStageShortcuts.push({
+                this.#matchingMultiStageShortcuts.push({
                     handler,
                     primaryActivator: shortcutActivator,
                     secondaryActivators,
@@ -242,37 +242,37 @@ class MultiStageShortcutManager extends Clutter.Actor {
             }
         });
 
-        this._startWaitingForInputTimer();
+        this.#startWaitingForInputTimer();
     }
 
     register(shortcut, handler) {
-        return this._handlers.set(shortcut, handler);
+        return this.#handlers.set(shortcut, handler);
     }
 
     unregister(shortcut) {
-        return this._handlers.delete(shortcut);
+        return this.#handlers.delete(shortcut);
     }
 
     isRegistered(shortcut) {
-        return this._handlers.has(shortcut);
+        return this.#handlers.has(shortcut);
     }
 
     vfunc_key_press_event(event) {
-        this._startWaitingForInputTimer();
+        this.#startWaitingForInputTimer();
 
         const eventKeyval = event.get_key_symbol();
 
-        if (this._ignoreKeyval(eventKeyval)) {
+        if (this.#ignoreKeyval(eventKeyval)) {
             return Clutter.EVENT_STOP;
         }
 
         for (
-            let i = this._matchingMultiStageShortcuts.length - 1;
+            let i = this.#matchingMultiStageShortcuts.length - 1;
             i >= 0;
             i--
         ) {
             const matchingMultiStageShortcut =
-                this._matchingMultiStageShortcuts[i];
+                this.#matchingMultiStageShortcuts[i];
             const { secondaryActivators } = matchingMultiStageShortcut;
             const nextActivator = secondaryActivators.shift();
             const [nextKeyval, nextModifiers] = nextActivator.split("+");
@@ -284,30 +284,30 @@ class MultiStageShortcutManager extends Clutter.Actor {
 
             if (isMatchingActivator) {
                 if (secondaryActivators.length === 0) {
-                    this._finish();
+                    this.#finish();
                     matchingMultiStageShortcut.handler();
 
                     return Clutter.EVENT_STOP;
                 }
             } else {
-                this._matchingMultiStageShortcuts.splice(i, 1);
+                this.#matchingMultiStageShortcuts.splice(i, 1);
             }
         }
 
-        if (this._matchingMultiStageShortcuts.length === 0) {
-            this._finish(INVALID_KEY_SEQUENCE_STATUS_LABEL);
+        if (this.#matchingMultiStageShortcuts.length === 0) {
+            this.#finish(INVALID_KEY_SEQUENCE_STATUS_LABEL);
         }
 
         return Clutter.EVENT_STOP;
     }
 
-    _finish(error = "") {
-        if (this._grab) {
-            Main.popModal(this._grab);
-            this._grab = null;
+    #finish(error = "") {
+        if (this.#grab) {
+            Main.popModal(this.#grab);
+            this.#grab = null;
         }
 
-        this._matchingMultiStageShortcuts = [];
+        this.#matchingMultiStageShortcuts = [];
 
         if (this._waitingForInputTimer) {
             Timeouts.remove(this._waitingForInputTimer);
@@ -315,25 +315,25 @@ class MultiStageShortcutManager extends Clutter.Actor {
         }
 
         if (error) {
-            this._statusLabel.show();
-            this._statusLabel.text = error;
+            this.#statusLabel.show();
+            this.#statusLabel.text = error;
             this._statusLabelHideTimer = Timeouts.add({
                 interval: 1500,
                 fn: () => {
                     this._statusLabelHideTimer = 0;
-                    this._statusLabel.hide();
+                    this.#statusLabel.hide();
 
                     return GLib.SOURCE_REMOVE;
                 },
             });
         } else {
-            this._statusLabel.hide();
+            this.#statusLabel.hide();
         }
 
         this.hide();
     }
 
-    _ignoreKeyval(keyval) {
+    #ignoreKeyval(keyval) {
         return [
             Clutter.KEY_Alt_L,
             Clutter.KEY_Alt_R,
@@ -349,13 +349,13 @@ class MultiStageShortcutManager extends Clutter.Actor {
         ].includes(keyval);
     }
 
-    _startWaitingForInputTimer() {
+    #startWaitingForInputTimer() {
         this._waitingForInputTimer = Timeouts.add({
             name: "shell/shortcuts.js/MultiStageShortcutManager/_startWaitingForInputTimer",
             interval: 3000,
             fn: () => {
                 this._waitingForInputTimer = 0;
-                this._finish(NO_INPUT_STATUS_LABEL);
+                this.#finish(NO_INPUT_STATUS_LABEL);
 
                 return GLib.SOURCE_REMOVE;
             },

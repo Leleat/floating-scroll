@@ -14,14 +14,17 @@ export default class Prefs extends ExtensionPreferences {
 
         const builder = new Gtk.Builder();
 
-        builder.add_from_resource("/ui/pages/general.ui");
+        builder.add_from_resource("/ui/pages/windowPlacement.ui");
+        builder.add_from_resource("/ui/pages/windowFocus.ui");
         builder.add_from_resource("/ui/pages/shortcuts.ui");
 
-        window.add(builder.get_object("general"));
+        window.add(builder.get_object("window_placement"));
+        window.add(builder.get_object("window_focus"));
         window.add(builder.get_object("shortcuts"));
 
         const settings = this.getSettings();
 
+        bindComboRows(settings, builder);
         bindShortcuts(settings, builder);
 
         // We disable multi-stage shortcut activators when opening the shortcut
@@ -59,11 +62,45 @@ export default class Prefs extends ExtensionPreferences {
  * @param {Gtk.Builder} builder
  */
 function bindShortcuts(settings, builder) {
-    [].forEach((key) => {
+    [
+        "move-focus-left",
+        "move-focus-right",
+        "move-focus-up",
+        "move-focus-down",
+        "move-column-up",
+        "move-column-down",
+        "move-column-left",
+        "move-column-right",
+        "move-item-left",
+        "move-item-right",
+        "move-item-up",
+        "move-item-down",
+    ].forEach((key) => {
         /** @type {import("./prefs/fsShortcutRow.js").FsShortcutRow} */
         const widget = getWidget(builder, key);
 
         widget.bind(settings, key);
+    });
+}
+
+/**
+ * @param {Gio.Settings} settings
+ * @param {Gtk.Builder} builder
+ */
+function bindComboRows(settings, builder) {
+    const comboRows = [
+        "focus-behavior-main-axis",
+        // "focus-behavior-cross-axis",
+        "window-opening-position",
+    ];
+
+    comboRows.forEach((key) => {
+        const widget = builder.get_object(key.replaceAll("-", "_"));
+
+        widget.connect("notify::selected", () => {
+            settings.set_enum(key, widget.get_selected());
+        });
+        widget.set_selected(settings.get_enum(key));
     });
 }
 
