@@ -22,11 +22,11 @@ function disable() {
  */
 class Timeouts {
     /** @type {Map<number, string>} */
-    _sourceIdAndNames = new Map();
+    #sourceIdAndNames = new Map();
 
     destroy() {
-        this._sourceIdAndNames.forEach((_, id) => GLib.Source.remove(id));
-        this._sourceIdAndNames.clear();
+        this.#sourceIdAndNames.forEach((_, id) => GLib.Source.remove(id));
+        this.#sourceIdAndNames.clear();
     }
 
     /**
@@ -43,7 +43,7 @@ class Timeouts {
      */
     add({ interval, fn, priority = GLib.PRIORITY_DEFAULT, name = "" }) {
         if (name) {
-            for (const [id, _name] of this._sourceIdAndNames.entries()) {
+            for (const [id, _name] of this.#sourceIdAndNames.entries()) {
                 if (name === _name) {
                     this.remove(id);
                     break;
@@ -56,7 +56,7 @@ class Timeouts {
             const returnVal = fn();
 
             if (returnVal === GLib.SOURCE_REMOVE) {
-                this._sourceIdAndNames.delete(sourceID);
+                this.#sourceIdAndNames.delete(sourceID);
             }
 
             return returnVal;
@@ -64,7 +64,7 @@ class Timeouts {
 
         sourceID = GLib.timeout_add(priority, interval, selfRemovingFn);
 
-        this._sourceIdAndNames.set(sourceID, name);
+        this.#sourceIdAndNames.set(sourceID, name);
 
         return sourceID;
     }
@@ -73,11 +73,11 @@ class Timeouts {
      * @param {number} id
      */
     remove(id) {
-        if (!this._sourceIdAndNames.has(id)) {
+        if (!this.#sourceIdAndNames.has(id)) {
             return;
         }
 
-        this._sourceIdAndNames.delete(id);
+        this.#sourceIdAndNames.delete(id);
         GLib.Source.remove(id);
     }
 }

@@ -16,14 +16,15 @@ function disable() {
 
 class Injections {
     /** @type {InjectionManager} */
-    _injectionManager = new InjectionManager();
+    #injectionManager = new InjectionManager();
+
     /** @type {Map<object, string[]>} */
-    _injectedProperties = new Map();
+    #injectedProperties = new Map();
 
     destroy() {
-        this._injectionManager.clear();
+        this.#injectionManager.clear();
 
-        this._injectedProperties.forEach((injectedProps, target) => {
+        this.#injectedProperties.forEach((injectedProps, target) => {
             injectedProps.forEach((prop) => {
                 // accessor props
                 delete target[prop];
@@ -31,7 +32,7 @@ class Injections {
                 delete target[`__injected_map_${prop}`];
             });
         });
-        this._injectedProperties.clear();
+        this.#injectedProperties.clear();
     }
 
     /**
@@ -53,12 +54,12 @@ class Injections {
             configurable: true,
         });
 
-        const propNames = this._injectedProperties.get(prototype);
+        const propNames = this.#injectedProperties.get(prototype);
 
         if (propNames) {
             propNames.push(prop);
         } else {
-            this._injectedProperties.set(prototype, [prop]);
+            this.#injectedProperties.set(prototype, [prop]);
         }
     }
 
@@ -94,12 +95,12 @@ class Injections {
             configurable: true,
         });
 
-        const propNames = this._injectedProperties.get(prototype);
+        const propNames = this.#injectedProperties.get(prototype);
 
         if (propNames) {
             propNames.push(prop);
         } else {
-            this._injectedProperties.set(prototype, [prop]);
+            this.#injectedProperties.set(prototype, [prop]);
         }
     }
 
@@ -114,7 +115,7 @@ class Injections {
      *      `methodName`.
      */
     overrideMethod(prototype, methodName, fnCreator) {
-        this._injectionManager.overrideMethod(prototype, methodName, fnCreator);
+        this.#injectionManager.overrideMethod(prototype, methodName, fnCreator);
     }
 
     /**
@@ -124,16 +125,16 @@ class Injections {
      * @param {string} propName -
      */
     deleteProperty(prototype, propName) {
-        const propNames = this._injectedProperties.get(prototype);
+        const propNames = this.#injectedProperties.get(prototype);
 
         if (!propNames || !propNames.includes(propName)) {
             return;
         }
 
         if (propNames.length === 1) {
-            this._injectedProperties.delete(prototype);
+            this.#injectedProperties.delete(prototype);
         } else {
-            this._injectedProperties.set(
+            this.#injectedProperties.set(
                 prototype,
                 propNames.filter((p) => p !== propName),
             );
@@ -152,7 +153,7 @@ class Injections {
      * @param {string} methodName - the name of the method to restore
      */
     restoreMethod(prototype, methodName) {
-        this._injectionManager.restoreMethod(prototype, methodName);
+        this.#injectionManager.restoreMethod(prototype, methodName);
     }
 }
 

@@ -27,9 +27,10 @@ class Settings {
      * enabled. There are circumstances, when an extension's `disable` method
      * isn't called e. g. when the system shuts down or when gnome-shell crashes.
      */
-    _didntRevertPreviously;
+    #didntRevertPreviously;
+
     /** @type {Gio.Settings} */
-    _gioObject = Extension.lookupByURL(import.meta.url).getSettings();
+    #gioObject = Extension.lookupByURL(import.meta.url).getSettings();
 
     /**
      * @type {Map<string, Map<string, GLib.Variant>>} saves the native settings
@@ -37,26 +38,28 @@ class Settings {
      * schema_id of the overridden Gio.Settings. The value is a Map of the
      * overridden key and the settings old value.
      */
-    _runtimeOverriddes = new Map();
+    #runtimeOverriddes = new Map();
+
     /** @type {number[]} */
-    _watchIds = [];
+    #watchIds = [];
+
     /** @type {WeakMap<object, number[]>} */
-    _watchTrackers = new WeakMap();
+    #watchTrackers = new WeakMap();
 
     constructor() {
-        this._didntRevertPreviously =
-            this._gioObject.get_user_value("overridden-settings") !== null;
+        this.#didntRevertPreviously =
+            this.#gioObject.get_user_value("overridden-settings") !== null;
     }
 
     destroy() {
-        this._clearOverriddenSettings();
+        this.#clearOverriddenSettings();
 
-        this._watchIds.forEach((id) => this._gioObject.disconnect(id));
-        this._watchIds = [];
+        this.#watchIds.forEach((id) => this.#gioObject.disconnect(id));
+        this.#watchIds = [];
 
-        this._watchTrackers = new WeakMap();
+        this.#watchTrackers = new WeakMap();
 
-        this._gioObject = null;
+        this.#gioObject = null;
     }
 
     /**
@@ -69,15 +72,15 @@ class Settings {
     override(settings, key, newValue) {
         const schemaId = settings.schema_id;
         const userValue = settings.get_user_value(key);
-        const oldSettingsMap = this._runtimeOverriddes.get(schemaId);
+        const oldSettingsMap = this.#runtimeOverriddes.get(schemaId);
 
         if (oldSettingsMap) {
             oldSettingsMap.set(key, userValue);
         } else {
-            this._runtimeOverriddes.set(schemaId, new Map([[key, userValue]]));
+            this.#runtimeOverriddes.set(schemaId, new Map([[key, userValue]]));
         }
 
-        this._updateBackupOverrides(schemaId, key, userValue);
+        this.#updateBackupOverrides(schemaId, key, userValue);
         settings.set_value(key, newValue);
     }
 
@@ -91,7 +94,7 @@ class Settings {
      * @returns {number}
      */
     watch(key, fn, { tracker = null, immediate = false } = {}) {
-        const id = this._gioObject.connect(`changed::${key}`, () =>
+        const id = this.#gioObject.connect(`changed::${key}`, () =>
             fn(this, key),
         );
 
@@ -99,13 +102,13 @@ class Settings {
             fn(this, key);
         }
 
-        this._watchIds.push(id);
+        this.#watchIds.push(id);
 
         if (tracker) {
-            const trackedIds = this._watchTrackers.get(tracker) ?? [];
+            const trackedIds = this.#watchTrackers.get(tracker) ?? [];
 
             trackedIds.push(id);
-            this._watchTrackers.set(tracker, trackedIds);
+            this.#watchTrackers.set(tracker, trackedIds);
         }
 
         return id;
@@ -120,15 +123,15 @@ class Settings {
         if (typeof idOrTracker === "number") {
             const id = idOrTracker;
 
-            if (!this._watchIds.includes(id)) {
+            if (!this.#watchIds.includes(id)) {
                 return;
             }
 
-            this._gioObject.disconnect(id);
-            this._watchIds = this._watchIds.filter((i) => i !== id);
+            this.#gioObject.disconnect(id);
+            this.#watchIds = this.#watchIds.filter((i) => i !== id);
         } else {
             const tracker = idOrTracker;
-            const trackedIds = this._watchTrackers.get(tracker);
+            const trackedIds = this.#watchTrackers.get(tracker);
 
             if (!trackedIds) {
                 return;
@@ -142,18 +145,18 @@ class Settings {
             // a strong reference to an object that may have been destroyed or
             // where the Settings singleton keeps the tracker obj from being
             // gc'd cause you forgot to call `unwatch` on it.
-            trackedIds.forEach((id) => this._gioObject.disconnect(id));
+            trackedIds.forEach((id) => this.#gioObject.disconnect(id));
 
-            this._watchTrackers.delete(tracker);
-            this._watchIds = this._watchIds.filter(
+            this.#watchTrackers.delete(tracker);
+            this.#watchIds = this.#watchIds.filter(
                 (id) => !trackedIds.includes(id),
             );
         }
     }
 
-    _clearOverriddenSettings() {
-        if (this._didntRevertPreviously) {
-            const previouslySavedSettings = this._gioObject
+    #clearOverriddenSettings() {
+        if (this.#didntRevertPreviously) {
+            const previouslySavedSettings = this.#gioObject
                 .get_value("overridden-settings")
                 .unpack();
 
@@ -175,7 +178,7 @@ class Settings {
                 }
             });
         } else {
-            this._runtimeOverriddes.forEach((overrides, schemaId) => {
+            this.#runtimeOverriddes.forEach((overrides, schemaId) => {
                 const gobject = new Gio.Settings({ schema_id: schemaId });
 
                 overrides.forEach((value, key) => {
@@ -188,16 +191,16 @@ class Settings {
             });
         }
 
-        this._gioObject.reset("overridden-settings");
-        this._runtimeOverriddes.clear();
+        this.#gioObject.reset("overridden-settings");
+        this.#runtimeOverriddes.clear();
     }
 
-    _updateBackupOverrides(schemaId, key, newValue) {
-        if (this._didntRevertPreviously) {
+    #updateBackupOverrides(schemaId, key, newValue) {
+        if (this.#didntRevertPreviously) {
             return;
         }
 
-        const savedSettings = this._gioObject
+        const savedSettings = this.#gioObject
             .get_value("overridden-settings")
             .deepUnpack();
         const prefKey = `${schemaId}.${key}`;
@@ -205,7 +208,7 @@ class Settings {
         savedSettings[prefKey] =
             newValue ?? GLib.Variant.new_maybe(new GLib.VariantType("b"), null);
 
-        this._gioObject.set_value(
+        this.#gioObject.set_value(
             "overridden-settings",
             new GLib.Variant("a{sv}", savedSettings),
         );
@@ -217,7 +220,27 @@ class Settings {
 
     /** @returns {Gio.Settings} */
     getGioObject() {
-        return this._gioObject;
+        return this.#gioObject;
+    }
+
+    /** @returns {number} */
+    getFocusBehaviorMainAxis() {
+        return this.#gioObject.get_enum("focus-behavior-main-axis");
+    }
+
+    /** @returns {number} */
+    getFocusBehaviorCrossAxis() {
+        return this.#gioObject.get_enum("focus-behavior-cross-axis");
+    }
+
+    /** @returns {number} */
+    getLogLevel() {
+        return this.#gioObject.get_int("log-level");
+    }
+
+    /** @returns {number} */
+    getWindowOpeningPosition() {
+        return this.#gioObject.get_enum("window-opening-position");
     }
 
     /***************************************************************************
