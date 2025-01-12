@@ -10,14 +10,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Install Deno
-        uses: denoland/setup-deno@v2
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          deno-version: v2.x
+          node-version: '20.x'
+      - name: Install dependencies
+        run: npm ci
       - name: Check code formatting
-        run: deno task check:format
+        run: npm run check:format
       - name: Lint code
-        run: deno task check:lint
+        run: npm run check:lint
   commit-message:
     runs-on: ubuntu-latest
     steps:
@@ -31,8 +33,6 @@ jobs:
           node-version: '20.x'
       - name: Install commitlint
         run: |
-          npm init -y
-          npm pkg set type="module"
           npm install @commitlint/config-conventional @commitlint/cli
           echo "export default {extends: ['@commitlint/config-conventional']};" > commitlint.config.js
       - name: Lint commit messages
