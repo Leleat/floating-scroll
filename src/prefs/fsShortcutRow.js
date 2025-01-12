@@ -60,9 +60,9 @@ export class FsShortcutRow extends Adw.ActionRow {
 
         if (shortcut) {
             const separator = secondaryActivators.length ? "  🠦  " : "";
-            const label = `${formatShortcut(shortcut)}${separator}${
-                secondaryActivators.join(separator)
-            }`;
+            const label = `${formatShortcut(shortcut)}${separator}${secondaryActivators.join(
+                separator,
+            )}`;
 
             this._label.set_label(label);
             this._label.set_tooltip_text(label);
