@@ -7,8 +7,9 @@
     "build": "./scripts/build.sh",
     "build:dev": "./scripts/build.sh --unsafe-reload",
     "build:install": "./scripts/build.sh --install",
-    "check:lint": "eslint src/",
-    "check:format": "prettier -c src/",
+    "check:lint": "eslint src/ tests/",
+    "check:format": "prettier -c src/ tests/",
+    "test": "vitest",
     "translations:update": "./scripts/update-translations.sh"
   },
   "repository": {

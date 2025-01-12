@@ -1,6 +1,88 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist>
+    <enum id='org.gnome.shell.extensions.floating-scroll.focus-behavior'>
+        <value value='0' nick='center' />
+        <value value='1' nick='lazy_follow' />
+    </enum>
+    <enum id='org.gnome.shell.extensions.floating-scroll.window-opening-position'>
+        <value value='0' nick='left' />
+        <value value='1' nick='right' />
+        <value value='2' nick='mru' />
+    </enum>
+
     <schema id="org.gnome.shell.extensions.floating-scroll" path="/org/gnome/shell/extensions/floating-scroll/">
+        <!--                               -->
+        <!-- Public keys for user settings -->
+        <!--                               -->
+
+        <key name="focus-behavior-main-axis" enum="org.gnome.shell.extensions.floating-scroll.focus-behavior">
+            <default>'center'</default>
+            <summary>Focus behavior on the main axis</summary>
+        </key>
+        <key name="focus-behavior-cross-axis" enum="org.gnome.shell.extensions.floating-scroll.focus-behavior">
+            <default>'lazy_follow'</default>
+            <summary>Focus behavior on the cross axis</summary>
+        </key>
+        <key name="window-opening-position" enum="org.gnome.shell.extensions.floating-scroll.window-opening-position">
+            <default>'left'</default>
+            <summary>Initial position when opening a window</summary>
+        </key>
+
+        <!--                  -->
+        <!--    Shortcuts     -->
+        <!--                  -->
+
+        <key name="move-focus-left" type="as">
+            <default>['&lt;Super&gt;Left']</default>
+            <summary>Move focus to left</summary>
+        </key>
+        <key name="move-focus-right" type="as">
+            <default>['&lt;Super&gt;Right']</default>
+            <summary>Move focus to right</summary>
+        </key>
+        <key name="move-focus-up" type="as">
+            <default>['&lt;Super&gt;Up']</default>
+            <summary>Move focus up</summary>
+        </key>
+        <key name="move-focus-down" type="as">
+            <default>['&lt;Super&gt;Down']</default>
+            <summary>Move focus down</summary>
+        </key>
+
+        <key name="move-column-left" type="as">
+            <default>['&lt;Super&gt;&lt;Ctrl&gt;Left']</default>
+            <summary>Move column left</summary>
+        </key>
+        <key name="move-column-right" type="as">
+            <default>['&lt;Super&gt;&lt;Ctrl&gt;Right']</default>
+            <summary>Move column right</summary>
+        </key>
+        <key name="move-column-up" type="as">
+            <default>['&lt;Super&gt;&lt;Ctrl&gt;Up']</default>
+            <summary>Move column up</summary>
+        </key>
+        <key name="move-column-down" type="as">
+            <default>['&lt;Super&gt;&lt;Ctrl&gt;Down']</default>
+            <summary>Move colum down</summary>
+        </key>
+
+        <key name="move-item-left" type="as">
+            <default>['&lt;Super&gt;&lt;Shift&gt;Left']</default>
+            <summary>Move item left</summary>
+        </key>
+        <key name="move-item-right" type="as">
+            <default>['&lt;Super&gt;&lt;Shift&gt;Right']</default>
+            <summary>Move item right</summary>
+        </key>
+        <key name="move-item-up" type="as">
+            <default>['&lt;Super&gt;&lt;Shift&gt;Up']</default>
+            <summary>Move item up</summary>
+        </key>
+        <key name="move-item-down" type="as">
+            <default>['&lt;Super&gt;&lt;Shift&gt;Down']</default>
+            <summary>Move item down</summary>
+        </key>
+
         <!--                               -->
         <!-- Private keys for internal use -->
         <!--                               -->
@@ -8,6 +90,11 @@
         <key name="overridden-settings" type="a{sv}">
             <default>[]</default>
             <summary>Private key: Saves the overridden native settings</summary>
+        </key>
+
+        <key name="log-level" type="i">
+            <default>1000</default>
+            <summary>Private key: Determines the log level</summary>
         </key>
 
         <key name="multi-stage-shortcut-activator-0" type="as">
@@ -100,9 +187,5 @@
         <key name="multi-stage-shortcut-activator-29" type="as">
             <default>[]</default>
         </key>
-
-        <!--                               -->
-        <!-- Public keys for user settings -->
-        <!--                               -->
     </schema>
 </schemalist>

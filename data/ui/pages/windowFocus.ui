@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface domain="floating-scroll@extensions.leleat">
+  <object class="AdwPreferencesPage" id="window_focus">
+    <property name="title" translatable="yes">Window Focus</property>
+    <property name="icon-name">view-app-grid-symbolic</property>
+    <child>
+      <object class="AdwPreferencesGroup">
+        <child>
+          <object class="AdwComboRow" id="focus_behavior_main_axis">
+            <property name="title" translatable="yes" comments="">Main Axis</property>
+            <property name="model">
+              <object class="GtkStringList">
+                <items>
+                  <item translatable="yes" comments="">Center</item>
+                  <item translatable="yes" comments="">Follow lazily</item>
+                </items>
+              </object>
+            </property>
+          </object>
+        </child>
+        <!-- <child>
+          <object class="AdwComboRow" id="focus_behavior_cross_axis">
+            <property name="title" translatable="yes" comments="">Cross Axis</property>
+            <property name="model">
+              <object class="GtkStringList">
+                <items>
+                  <item translatable="yes" comments="">Center</item>
+                  <item translatable="yes" comments="">Follow lazily</item>
+                </items>
+              </object>
+            </property>
+          </object>
+        </child> -->
+      </object>
+    </child>
+  </object>
+</interface>

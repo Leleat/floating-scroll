@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface domain="floating-scroll@extensions.leleat">
+  <object class="AdwPreferencesPage" id="window_placement">
+    <property name="title" translatable="yes">Window Placement</property>
+    <property name="icon-name">view-app-grid-symbolic</property>
+    <child>
+      <object class="AdwPreferencesGroup">
+        <child>
+          <object class="AdwComboRow" id="window_opening_position">
+            <property name="title" translatable="yes" comments="">Window Opening Position</property>
+            <property name="model">
+              <object class="GtkStringList">
+                <items>
+                  <item translatable="yes" comments="">Left</item>
+                  <item translatable="yes" comments="">Right</item>
+                  <item translatable="yes" comments="">Between MRU Windows</item>
+                </items>
+              </object>
+            </property>
+          </object>
+        </child>
+      </object>
+    </child>
+  </object>
+</interface>
