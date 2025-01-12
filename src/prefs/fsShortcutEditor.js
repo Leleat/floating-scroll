@@ -66,13 +66,11 @@ export class FsShortcutEditor extends Adw.Window {
             }),
         });
 
-        this.connect(
-            "map",
-            () => disableMultiStageShortcutActivators(settings),
+        this.connect("map", () =>
+            disableMultiStageShortcutActivators(settings),
         );
-        this.connect(
-            "unmap",
-            () => updateMultiStageShortcutActivators(settings),
+        this.connect("unmap", () =>
+            updateMultiStageShortcutActivators(settings),
         );
     }
 
@@ -81,14 +79,14 @@ export class FsShortcutEditor extends Adw.Window {
 
         settings.set_strv(
             this._currShortcutKey,
-            this._currPrimaryActivator
-                ? [
+            this._currPrimaryActivator ?
+                [
                     this._currPrimaryActivator,
                     ...this._currSecondaryActivators.map(
                         (s) => `${s.keyval}+${gdkToClutterMask(s.mask)}`,
                     ),
                 ]
-                : [],
+            :   [],
         );
 
         this.close();
@@ -103,7 +101,8 @@ export class FsShortcutEditor extends Adw.Window {
      * @returns {Gdk.EVENT_STOP}
      */
     on_event_controller_key_pressed(_, keyval, keycode, state) {
-        const mask = state &
+        const mask =
+            state &
             Gtk.accelerator_get_default_mod_mask() &
             ~Gdk.ModifierType.LOCK_MASK;
 
@@ -168,12 +167,12 @@ export class FsShortcutEditor extends Adw.Window {
     _setPreviewLabel({ primaryActivator, secondaryActivators }) {
         if (primaryActivator) {
             const secondaryActivatorLabels = secondaryActivators.map((c) =>
-                Gtk.accelerator_get_label(c.keyval, c.mask)
+                Gtk.accelerator_get_label(c.keyval, c.mask),
             );
             const separator = secondaryActivatorLabels.length ? "        " : "";
-            const shortcutLabel = `${
-                formatShortcut(primaryActivator)
-            }${separator}${secondaryActivatorLabels.join(separator)}`;
+            const shortcutLabel = `${formatShortcut(
+                primaryActivator,
+            )}${separator}${secondaryActivatorLabels.join(separator)}`;
 
             this._preview_new_shortcut_label.set_tooltip_text(shortcutLabel);
             this._preview_new_shortcut_label.set_label(

@@ -1,0 +1,40 @@
+{
+  "name": "floating-scroll",
+  "version": "0.1.0",
+  "description": "Floating Scroll is a GNOME Shell extension that implements a scrollable floating window manager",
+  "private": true,
+  "scripts": {
+    "build": "./scripts/build.sh",
+    "build:dev": "./scripts/build.sh --unsafe-reload",
+    "build:install": "./scripts/build.sh --install",
+    "check:lint": "eslint src/",
+    "check:format": "prettier -c src/",
+    "translations:update": "./scripts/update-translations.sh"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Leleat/floating-scroll.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Leleat/floating-scroll/issues"
+  },
+  "homepage": "https://github.com/Leleat/floating-scroll",
+  "type": "module",
+  "keywords": [
+    "GNOME",
+    "GNOME Shell",
+    "GJS",
+    "Extension"
+  ],
+  "author": "Anh Le",
+  "license": "GPL-2.0-or-later",
+  "devDependencies": {
+    "@eslint/js": "^9.18.0",
+    "@girs/gjs": "^4.0.0-beta.19",
+    "@girs/gnome-shell": "^47.0.0",
+    "eslint": "^9.18.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.4.2",
+    "vitest": "^2.1.8"
+  }
+}

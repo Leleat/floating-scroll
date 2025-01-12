@@ -44,7 +44,7 @@ class Shortcuts {
         Settings.unwatch(this);
 
         this._registeredShortcuts.forEach((shortcut) =>
-            Main.wm.removeKeybinding(shortcut)
+            Main.wm.removeKeybinding(shortcut),
         );
         this._registeredShortcuts = [];
 
@@ -154,8 +154,8 @@ class Shortcuts {
                     Settings.unwatch(id);
 
                     Main.wm.removeKeybinding(key);
-                    this._registeredShortcuts = this._registeredShortcuts
-                        .filter(
+                    this._registeredShortcuts =
+                        this._registeredShortcuts.filter(
                             (shortcut) => shortcut !== key,
                         );
 
@@ -230,8 +230,8 @@ class MultiStageShortcutManager extends Clutter.Actor {
         const [activator] = Settings.getGioObject().get_strv(shortcutKey);
 
         this._handlers.forEach((handler, scKey) => {
-            const [shortcutActivator, ...secondaryActivators] = Settings
-                .getGioObject().get_strv(scKey);
+            const [shortcutActivator, ...secondaryActivators] =
+                Settings.getGioObject().get_strv(scKey);
 
             if (shortcutActivator === activator) {
                 this._matchingMultiStageShortcuts.push({
@@ -276,7 +276,8 @@ class MultiStageShortcutManager extends Clutter.Actor {
             const { secondaryActivators } = matchingMultiStageShortcut;
             const nextActivator = secondaryActivators.shift();
             const [nextKeyval, nextModifiers] = nextActivator.split("+");
-            const isMatchingActivator = nextKeyval === String(eventKeyval) &&
+            const isMatchingActivator =
+                nextKeyval === String(eventKeyval) &&
                 // Wayland includes NumLock/fn as part of the state.
                 (nextModifiers ?? "0") ===
                     String(event.get_state() & ~Clutter.ModifierType.MOD2_MASK);
@@ -350,8 +351,7 @@ class MultiStageShortcutManager extends Clutter.Actor {
 
     _startWaitingForInputTimer() {
         this._waitingForInputTimer = Timeouts.add({
-            name:
-                "shell/shortcuts.js/MultiStageShortcutManager/_startWaitingForInputTimer",
+            name: "shell/shortcuts.js/MultiStageShortcutManager/_startWaitingForInputTimer",
             interval: 3000,
             fn: () => {
                 this._waitingForInputTimer = 0;

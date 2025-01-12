@@ -91,9 +91,8 @@ class Settings {
      * @returns {number}
      */
     watch(key, fn, { tracker = null, immediate = false } = {}) {
-        const id = this._gioObject.connect(
-            `changed::${key}`,
-            () => fn(this, key),
+        const id = this._gioObject.connect(`changed::${key}`, () =>
+            fn(this, key),
         );
 
         if (immediate) {
@@ -203,8 +202,8 @@ class Settings {
             .deepUnpack();
         const prefKey = `${schemaId}.${key}`;
 
-        savedSettings[prefKey] = newValue ??
-            GLib.Variant.new_maybe(new GLib.VariantType("b"), null);
+        savedSettings[prefKey] =
+            newValue ?? GLib.Variant.new_maybe(new GLib.VariantType("b"), null);
 
         this._gioObject.set_value(
             "overridden-settings",

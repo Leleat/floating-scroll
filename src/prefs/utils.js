@@ -69,9 +69,9 @@ const CLUTTER_MOD4_MASK = 64;
  * @returns {number}
  */
 export function clutterToGdkMask(mask) {
-    return (mask & CLUTTER_MOD4_MASK) !== 0
-        ? (mask & ~CLUTTER_MOD4_MASK) | Gdk.ModifierType.SUPER_MASK
-        : mask;
+    return (mask & CLUTTER_MOD4_MASK) !== 0 ?
+            (mask & ~CLUTTER_MOD4_MASK) | Gdk.ModifierType.SUPER_MASK
+        :   mask;
 }
 
 /**
@@ -80,9 +80,9 @@ export function clutterToGdkMask(mask) {
  * @returns {number}
  */
 export function gdkToClutterMask(mask) {
-    return (mask & Gdk.ModifierType.SUPER_MASK) !== 0
-        ? (mask & ~Gdk.ModifierType.SUPER_MASK) | CLUTTER_MOD4_MASK
-        : mask;
+    return (mask & Gdk.ModifierType.SUPER_MASK) !== 0 ?
+            (mask & ~Gdk.ModifierType.SUPER_MASK) | CLUTTER_MOD4_MASK
+        :   mask;
 }
 
 /**
