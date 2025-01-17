@@ -1521,4 +1521,14 @@ function insertWindowBetweenMrus(
     }
 }
 
-export { WorkspaceModel };
+let TestEnv;
+
+if (process.env.NODE_ENV === "test") {
+    TestEnv = {
+        Column,
+        Item,
+        WindowOpeningPosition,
+    };
+}
+
+export { TestEnv, WorkspaceModel };
