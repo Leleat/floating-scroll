@@ -151,7 +151,9 @@ class Column {
      */
     constructor({ items = [], focusedItem = 0 } = {}) {
         Debug.assert(
-            Array.isArray(items) && items.length > 0,
+            Array.isArray(items) &&
+                items.every((item) => item instanceof Item) &&
+                items.length > 0,
             `Columns must have at least one item: ${items}`,
         );
 
@@ -196,7 +198,10 @@ class Column {
      *
      * @returns {Column}
      */
-    clone({ items = this.#items, focusedItem = this.#focusedItem } = {}) {
+    clone({
+        items = this.#items.map((i) => i.clone()),
+        focusedItem = this.#focusedItem,
+    } = {}) {
         return new Column({ items, focusedItem });
     }
 
@@ -348,7 +353,8 @@ class WorkspaceModel {
         },
     } = {}) {
         Debug.assert(
-            Array.isArray(columns),
+            Array.isArray(columns) &&
+                columns.every((col) => col instanceof Column),
             `columns must be an array of columns: ${columns}`,
         );
 
@@ -372,11 +378,12 @@ class WorkspaceModel {
 
     clone({
         focusedColumn = this.#focusedColumn,
-        columns = this.#columns,
+        columns = this.#columns.map((col) => col.clone()),
         workArea = this.#workArea,
+        workspaceModelManager = this.#workspaceModelManager,
     } = {}) {
         return new WorkspaceModel({
-            workspaceModelManager: this.#workspaceModelManager,
+            workspaceModelManager,
             columns,
             focusedColumn,
             workArea,
@@ -1393,17 +1400,16 @@ function insertWindowOnLeftOfFocus(
 ) {
     const windowFrame = window.get_frame_rect();
     const [prevFocusedWindow] = mrus;
+    const prevCol =
+        prevFocusedWindow &&
+        columns.find((col) => col.contains(prevFocusedWindow));
     const newColumn = new Column({
         focusedItem: 0,
         items: [
             new Item({
                 value: window,
                 rect: {
-                    x:
-                        prevFocusedWindow ?
-                            prevFocusedWindow.get_frame_rect().x -
-                            windowFrame.width
-                        :   0,
+                    x: prevCol ? prevCol.rect.x - windowFrame.width : 0,
                     y: Math.floor(
                         workspace.height / 2 - windowFrame.height / 2,
                     ),
@@ -1439,17 +1445,16 @@ function insertWindowOnRightOfFocus(
 ) {
     const windowFrame = window.get_frame_rect();
     const [prevFocusedWindow] = mrus;
+    const prevCol =
+        prevFocusedWindow &&
+        columns.find((col) => col.contains(prevFocusedWindow));
     const newColumn = new Column({
         focusedItem: 0,
         items: [
             new Item({
                 value: window,
                 rect: {
-                    x:
-                        prevFocusedWindow ?
-                            prevFocusedWindow.get_frame_rect().x +
-                            windowFrame.width
-                        :   0,
+                    x: prevCol ? prevCol.rect.x + windowFrame.width : 0,
                     y: Math.floor(
                         workspace.height / 2 - windowFrame.height / 2,
                     ),
@@ -1498,9 +1503,11 @@ function insertWindowBetweenMrus(
         );
     }
 
-    const direction =
-        prevFocusedWindow.get_frame_rect().x -
-        prevPrevFocusedWindow.get_frame_rect().x;
+    const prevCol = columns.find((col) => col.contains(prevFocusedWindow));
+    const prevPrevCol = columns.find((col) =>
+        col.contains(prevPrevFocusedWindow),
+    );
+    const direction = prevCol.rect.x - prevPrevCol.rect.x;
 
     if (direction > 0) {
         return insertWindowOnLeftOfFocus(
@@ -1521,4 +1528,14 @@ function insertWindowBetweenMrus(
     }
 }
 
-export { WorkspaceModel };
+let TestEnv;
+
+if (process.env.NODE_ENV === "test") {
+    TestEnv = {
+        Column,
+        Item,
+        WindowOpeningPosition,
+    };
+}
+
+export { TestEnv, WorkspaceModel };

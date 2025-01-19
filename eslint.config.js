@@ -19,6 +19,7 @@ export default [
                 logError: "readonly",
                 print: "readonly",
                 printerr: "readonly",
+                process: "readonly",
                 window: "readonly",
                 TextEncoder: "readonly",
                 TextDecoder: "readonly",
