@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <interface domain="floating-scroll@extensions.leleat">
-  <object class="AdwPreferencesPage" id="window_placement">
+  <object class="AdwPreferencesPage" id="window-placement">
     <property name="title" translatable="yes">Window Placement</property>
     <property name="icon-name">view-app-grid-symbolic</property>
     <child>
       <object class="AdwPreferencesGroup">
         <child>
-          <object class="AdwComboRow" id="window_opening_position">
+          <object class="AdwComboRow" id="window-opening-position">
             <property name="title" translatable="yes" comments="">Window Opening Position</property>
             <property name="model">
               <object class="GtkStringList">

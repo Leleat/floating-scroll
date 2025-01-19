@@ -18,8 +18,8 @@ export default class Prefs extends ExtensionPreferences {
         builder.add_from_resource("/ui/pages/windowFocus.ui");
         builder.add_from_resource("/ui/pages/shortcuts.ui");
 
-        window.add(builder.get_object("window_placement"));
-        window.add(builder.get_object("window_focus"));
+        window.add(builder.get_object("window-placement"));
+        window.add(builder.get_object("window-focus"));
         window.add(builder.get_object("shortcuts"));
 
         const settings = this.getSettings();
@@ -77,7 +77,7 @@ function bindShortcuts(settings, builder) {
         "move-item-down",
     ].forEach((key) => {
         /** @type {import("./prefs/fsShortcutRow.js").FsShortcutRow} */
-        const widget = getWidget(builder, key);
+        const widget = builder.get_object(key);
 
         widget.bind(settings, key);
     });
@@ -95,21 +95,11 @@ function bindComboRows(settings, builder) {
     ];
 
     comboRows.forEach((key) => {
-        const widget = builder.get_object(key.replaceAll("-", "_"));
+        const widget = builder.get_object(key);
 
         widget.connect("notify::selected", () => {
             settings.set_enum(key, widget.get_selected());
         });
         widget.set_selected(settings.get_enum(key));
     });
-}
-
-/**
- * @param {Gtk.Builder} builder
- * @param {string} key
- *
- * @returns {Gtk.Widget}
- */
-function getWidget(builder, key) {
-    return builder.get_object(key.replaceAll("-", "_"));
 }
