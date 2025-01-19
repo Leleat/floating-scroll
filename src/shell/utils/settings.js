@@ -234,8 +234,8 @@ class Settings {
     }
 
     /** @returns {number} */
-    getLogLevel() {
-        return this.#gioObject.get_int("log-level");
+    getDebugLevel() {
+        return this.#gioObject.get_enum("debug-level");
     }
 
     /** @returns {number} */

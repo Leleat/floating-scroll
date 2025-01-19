@@ -1,7 +1,7 @@
 /** @type {DebugModule} */
 let MODULE = null;
 
-const LogLevel = Object.freeze({
+const DebugLevel = Object.freeze({
     DEBUG: 100,
     WARN: 200,
     TRACE: 300,
@@ -22,7 +22,8 @@ function disable() {
 }
 
 class DebugModule {
-    #logLevel = LogLevel.OFF;
+    /** @type {DebugLevel} */
+    #debugLevel;
 
     /**
      * @param {object} param
@@ -30,8 +31,8 @@ class DebugModule {
      */
     constructor({ settings }) {
         settings.watch(
-            "log-level",
-            () => (this.#logLevel = settings.getLogLevel()),
+            "debug-level",
+            () => (this.#debugLevel = settings.getDebugLevel()),
             { tracker: this, immediate: true },
         );
     }
@@ -40,12 +41,13 @@ class DebugModule {
 
     /**
      * @param {boolean} condition
-     * @param {string} message
+     * @param {string} [message]
+     * @param {number} [debugLevel]
      *
      * @throws {Error} If the condition is not met.
      */
-    assert(condition, message = "") {
-        if (!condition) {
+    assert(condition, message = "", debugLevel = DebugLevel.DEBUG) {
+        if (this.#debugLevel <= debugLevel && !condition) {
             throw new Error(`Assertion failed. ${message}`);
         }
     }
@@ -74,7 +76,7 @@ class DebugModule {
      * @returns {DebugModule}
      */
     log(...data) {
-        if (this.#logLevel <= LogLevel.DEBUG) {
+        if (this.#debugLevel <= DebugLevel.DEBUG) {
             console.log(...data);
         }
 
@@ -87,7 +89,7 @@ class DebugModule {
      * @returns {DebugModule}
      */
     warn(...data) {
-        if (this.#logLevel <= LogLevel.WARN) {
+        if (this.#debugLevel <= DebugLevel.WARN) {
             console.warn(...data);
         }
 
@@ -100,7 +102,7 @@ class DebugModule {
      * @returns {DebugModule}
      */
     trace(...data) {
-        if (this.#logLevel <= LogLevel.TRACE) {
+        if (this.#debugLevel <= DebugLevel.TRACE) {
             console.trace(...data);
         }
 
@@ -113,7 +115,7 @@ class DebugModule {
      * @returns {DebugModule}
      */
     error(...data) {
-        if (this.#logLevel <= LogLevel.ERROR) {
+        if (this.#debugLevel <= DebugLevel.ERROR) {
             console.error(...data);
         }
 
@@ -121,4 +123,4 @@ class DebugModule {
     }
 }
 
-export { disable, enable, MODULE as Debug };
+export { disable, enable, DebugLevel, MODULE as Debug };
