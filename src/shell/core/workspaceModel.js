@@ -1530,7 +1530,7 @@ function insertWindowBetweenMrus(
 
 let TestEnv;
 
-if (process.env.NODE_ENV === "test") {
+if (globalThis.process?.env.NODE_ENV === "test") {
     TestEnv = {
         Column,
         Item,
