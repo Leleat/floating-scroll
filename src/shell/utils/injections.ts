@@ -1,9 +1,9 @@
+// TODO TypeScript wizard needed here...
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { InjectionManager } from "../dependencies.js";
 
-/**
- * @type {Injections}
- */
-let SINGLETON = null;
+let SINGLETON: Injections = null!;
 
 function enable() {
     SINGLETON = new Injections();
@@ -11,40 +11,42 @@ function enable() {
 
 function disable() {
     SINGLETON.destroy();
-    SINGLETON = null;
+    SINGLETON = null!;
 }
 
 class Injections {
-    /** @type {InjectionManager} */
-    #injectionManager = new InjectionManager();
-
-    /** @type {Map<object, string[]>} */
-    #injectedProperties = new Map();
+    private injectionManager = new InjectionManager();
+    private injectedProperties: Map<{ [key: string]: any }, string[]> =
+        new Map();
 
     destroy() {
-        this.#injectionManager.clear();
+        this.injectionManager.clear();
 
-        this.#injectedProperties.forEach((injectedProps, target) => {
-            injectedProps.forEach((prop) => {
+        this.injectedProperties.forEach((injectedProps, target) => {
+            injectedProps.forEach((prop: string) => {
                 // accessor props
                 delete target[prop];
                 // data props
                 delete target[`__injected_map_${prop}`];
             });
         });
-        this.#injectedProperties.clear();
+        this.injectedProperties.clear();
     }
 
     /**
      * Injects new accessor property into a prototype
      *
-     * @param {object} prototype -
-     * @param {string} prop -
-     * @param {object} descriptor -
+     * @param prototype -
+     * @param prop -
+     * @param descriptor -
      */
-    addAccessorProperty(prototype, prop, descriptor) {
+    addAccessorProperty(
+        prototype: { [key: string]: any },
+        prop: string,
+        descriptor: object,
+    ) {
         if (prototype[prop] !== undefined) {
-            console.warn(
+            throw new Error(
                 `Overwriting existing property (${prop}) not supported....`,
             );
         }
@@ -54,12 +56,12 @@ class Injections {
             configurable: true,
         });
 
-        const propNames = this.#injectedProperties.get(prototype);
+        const propNames = this.injectedProperties.get(prototype);
 
         if (propNames) {
             propNames.push(prop);
         } else {
-            this.#injectedProperties.set(prototype, [prop]);
+            this.injectedProperties.set(prototype, [prop]);
         }
     }
 
@@ -70,13 +72,10 @@ class Injections {
      * everything to the prototype, the removal of the custom properties is
      * relativly easy. We just need to track the prototype rather than finding
      * or tracking all object instances.
-     *
-     * @param {object} prototype -
-     * @param {string} prop -
      */
-    addDataProperty(prototype, prop) {
+    addDataProperty(prototype: { [key: string]: any }, prop: string) {
         if (prototype[prop] !== undefined) {
-            console.warn(
+            throw new Error(
                 `Overwriting existing property (${prop}) not supported....`,
             );
         }
@@ -95,46 +94,52 @@ class Injections {
             configurable: true,
         });
 
-        const propNames = this.#injectedProperties.get(prototype);
+        const propNames = this.injectedProperties.get(prototype);
 
         if (propNames) {
             propNames.push(prop);
         } else {
-            this.#injectedProperties.set(prototype, [prop]);
+            this.injectedProperties.set(prototype, [prop]);
         }
     }
 
     /**
      * Modifies, replaces or injects a method into a (prototype) object
      *
-     * @param {object} prototype - the object (or prototype) that is modified
-     * @param {string} methodName - the name of the overwritten method
-     * @param {(originalFn: Function) => Function} fnCreator - function to call
+     * @param prototype - the object (or prototype) that is modified
+     * @param methodName - the name of the overwritten method
+     * @param createOverrideFunc - function to call
      *      to create the override. The parameter will be the original function,
-     *      if it exists. It returns the new function be used for
-     *      `methodName`.
+     *      if it exists. It returns the new function be used for `methodName`.
      */
-    overrideMethod(prototype, methodName, fnCreator) {
-        this.#injectionManager.overrideMethod(prototype, methodName, fnCreator);
+    overrideMethod(
+        prototype: { [key: string]: any },
+        methodName: string,
+        createOverrideFunc: (
+            original: (...args: any[]) => any,
+        ) => (...args: any[]) => any,
+    ) {
+        this.injectionManager.overrideMethod(
+            prototype,
+            methodName,
+            createOverrideFunc,
+        );
     }
 
     /**
      * Deletes a custom property injected with this singleton
-     *
-     * @param {object} prototype -
-     * @param {string} propName -
      */
-    deleteProperty(prototype, propName) {
-        const propNames = this.#injectedProperties.get(prototype);
+    deleteProperty(prototype: { [key: string]: any }, propName: string) {
+        const propNames = this.injectedProperties.get(prototype);
 
         if (!propNames || !propNames.includes(propName)) {
             return;
         }
 
         if (propNames.length === 1) {
-            this.#injectedProperties.delete(prototype);
+            this.injectedProperties.delete(prototype);
         } else {
-            this.#injectedProperties.set(
+            this.injectedProperties.set(
                 prototype,
                 propNames.filter((p) => p !== propName),
             );
@@ -148,12 +153,9 @@ class Injections {
 
     /**
      * Restores the original method
-     *
-     * @param {object} prototype - the object (or prototype) that is modified
-     * @param {string} methodName - the name of the method to restore
      */
-    restoreMethod(prototype, methodName) {
-        this.#injectionManager.restoreMethod(prototype, methodName);
+    restoreMethod(prototype: { [key: string]: any }, methodName: string) {
+        this.injectionManager.restoreMethod(prototype, methodName);
     }
 }
 

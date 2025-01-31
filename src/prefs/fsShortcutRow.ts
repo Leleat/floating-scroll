@@ -1,6 +1,6 @@
-import { Adw, GObject, Gtk } from "./dependencies.js";
+import { Adw, type Gio, GObject, Gtk } from "./dependencies.js";
 
-import { updateMultiStageShortcutActivators } from "../shared.js";
+import { ShortcutKey, updateMultiStageShortcutActivators } from "../shared.js";
 import { FsShortcutEditor } from "./fsShortcutEditor.js";
 import { clutterToGdkMask, formatShortcut } from "./utils.js";
 
@@ -18,40 +18,41 @@ export class FsShortcutRow extends Adw.ActionRow {
         );
     }
 
-    /** @type {string} */
-    _key;
-    /** @type {Gio.Settings} */
-    _settings;
+    declare _label: Gtk.Label;
+    declare _clear_button: Gtk.Button;
 
-    bind(settings, key) {
-        this._settings = settings;
-        this._key = key;
+    private key!: ShortcutKey;
+    private settings!: Gio.Settings;
 
-        this._updateUi();
-        this._settings.connect(`changed::${key}`, () => this._updateUi());
+    bind(settings: Gio.Settings, key: ShortcutKey) {
+        this.settings = settings;
+        this.key = key;
+
+        this.updateUi();
+        this.settings.connect(`changed::${key}`, () => this.updateUi());
 
         this.connect("activated", () => {
             new FsShortcutEditor({
                 shortcutName: this.get_title(),
                 shortcutKey: key,
-                transient_for: this.get_root(),
+                transient_for: this.get_root() as Adw.PreferencesWindow,
                 destroy_with_parent: true,
             }).present();
         });
     }
 
     on_clear_button_clicked() {
-        const wasMultiStage = this._settings.get_strv(this._key).length > 1;
+        const wasMultiStage = this.settings.get_strv(this.key).length > 1;
 
-        this._settings.set_strv(this._key, []);
+        this.settings.set_strv(this.key, []);
 
         if (wasMultiStage) {
-            updateMultiStageShortcutActivators(this._settings);
+            updateMultiStageShortcutActivators(this.settings);
         }
     }
 
-    _updateUi() {
-        const [shortcut, ...secondaries] = this._settings.get_strv(this._key);
+    private updateUi() {
+        const [shortcut, ...secondaries] = this.settings.get_strv(this.key);
         const secondaryActivators = secondaries.map((c) => {
             const [keyval, mask] = c.split("+").map(Number);
 

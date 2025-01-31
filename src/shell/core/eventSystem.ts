@@ -1,100 +1,101 @@
+import { Result } from "../../shared.js";
 import { GLib, Meta } from "../dependencies.js";
 
 import { Debug } from "../utils/debug.js";
-import { Settings } from "../utils/settings.js";
 import { Shortcuts } from "../utils/shortcuts.js";
 import { Timeouts } from "../utils/timeouts.js";
+import {
+    WorkspaceChangeResultErrors,
+    WorkspaceModel,
+} from "./workspaceModel.js";
 import { WorkspaceModelManager } from "./workspaceModelManager.js";
 
 class EventGenerator {
-    /** @type {Map<object, Function[]>} */
-    #subs = new Map();
-
-    /** @type {Event[]} */
-    #queue = [];
-    #queueIsProcessing = false;
+    private subs: Map<object, ((e: Event) => void)[]> = new Map();
+    private queue: Event[] = [];
+    private queueIsProcessing = false;
 
     constructor() {
-        this.#initializeExistingWindows();
+        this.initializeExistingWindows();
 
         global.display.connectObject(
             "window-created",
-            (_, win) => this.#onWindowCreated(win),
+            (_: Meta.Display, win: Meta.Window) => this.onWindowCreated(win),
             "notify::focus-window",
-            () => this.#onFocusWindowChanged(),
+            () => this.onFocusWindowChanged(),
             this,
         );
 
         Shortcuts.register({
             key: "move-focus-left",
             handler: () => {
-                this.#generateEvent(new MoveFocusLeftShortcutEvent());
+                this.generateEvent(new MoveFocusLeftShortcutEvent());
             },
         });
         Shortcuts.register({
             key: "move-focus-right",
             handler: () => {
-                this.#generateEvent(new MoveFocusRightShortcutEvent());
+                this.generateEvent(new MoveFocusRightShortcutEvent());
             },
         });
         Shortcuts.register({
             key: "move-focus-up",
             handler: () => {
-                this.#generateEvent(new MoveFocusUpShortcutEvent());
+                this.generateEvent(new MoveFocusUpShortcutEvent());
             },
         });
         Shortcuts.register({
             key: "move-focus-down",
             handler: () => {
-                this.#generateEvent(new MoveFocusDownShortcutEvent());
+                this.generateEvent(new MoveFocusDownShortcutEvent());
             },
         });
         Shortcuts.register({
             key: "move-column-up",
             handler: () => {
-                this.#generateEvent(new MoveColumnUpShortcutEvent());
+                this.generateEvent(new MoveColumnUpShortcutEvent());
             },
         });
         Shortcuts.register({
             key: "move-column-down",
             handler: () => {
-                this.#generateEvent(new MoveColumnDownShortcutEvent());
+                this.generateEvent(new MoveColumnDownShortcutEvent());
             },
         });
         Shortcuts.register({
             key: "move-column-left",
             handler: () => {
-                this.#generateEvent(new MoveColumnLeftShortcutEvent());
+                this.generateEvent(new MoveColumnLeftShortcutEvent());
             },
         });
         Shortcuts.register({
             key: "move-column-right",
             handler: () => {
-                this.#generateEvent(new MoveColumnRightShortcutEvent());
+                this.generateEvent(new MoveColumnRightShortcutEvent());
             },
         });
         Shortcuts.register({
             key: "move-item-up",
             handler: () => {
-                this.#generateEvent(new MoveItemUpShortcutEvent());
+                this.generateEvent(new MoveItemUpShortcutEvent());
             },
         });
         Shortcuts.register({
             key: "move-item-down",
             handler: () => {
-                this.#generateEvent(new MoveItemDownShortcutEvent());
+                this.generateEvent(new MoveItemDownShortcutEvent());
             },
         });
         Shortcuts.register({
             key: "move-item-left",
             handler: () => {
-                this.#generateEvent(new MoveItemLeftShortcutEvent());
+                this.generateEvent(new MoveItemLeftShortcutEvent());
             },
         });
         Shortcuts.register({
             key: "move-item-right",
             handler: () => {
-                this.#generateEvent(new MoveItemRightShortcutEvent());
+                this.generateEvent(new MoveItemRightShortcutEvent());
             },
         });
     }
@@ -105,61 +106,58 @@ class EventGenerator {
             a.disconnectObject(this);
         });
 
-        this.#subs.clear();
+        this.subs.clear();
     }
 
-    sub(subscriber, ...callbacks) {
-        if (this.#subs.has(subscriber)) {
-            this.#subs.get(subscriber).push(callbacks);
+    sub(subscriber: object, callback: (event: Event) => void) {
+        if (this.subs.has(subscriber)) {
+            this.subs.get(subscriber)!.push(callback);
         } else {
-            this.#subs.set(subscriber, callbacks);
+            this.subs.set(subscriber, [callback]);
         }
     }
 
-    unsub(subscriber) {
-        this.#subs.delete(subscriber);
+    unsub(subscriber: object) {
+        this.subs.delete(subscriber);
     }
 
-    #initializeExistingWindows() {
+    private initializeExistingWindows() {
         global.get_window_actors().forEach((windowActor) => {
-            const window = windowActor.get_meta_window();
+            const window = windowActor.get_meta_window() as Meta.Window;
 
             window.connectObject(
                 "unmanaging",
-                (w) => this.#onWindowUnmanaging(w),
+                (w: Meta.Window) => this.onWindowUnmanaging(w),
                 this,
             );
 
-            this.#generateEvent(new WindowOpenedEvent({ window }));
+            this.generateEvent(new WindowOpenedEvent({ window }));
         });
     }
 
-    /**
-     * @param {Event} event
-     */
-    #generateEvent(event) {
-        this.#queue.push(event);
+    private generateEvent(event: Event) {
+        this.queue.push(event);
 
-        if (this.#queueIsProcessing) {
+        if (this.queueIsProcessing) {
             return;
         }
 
-        this.#queueIsProcessing = true;
+        this.queueIsProcessing = true;
 
         // TODO check if this is neccecary
         Timeouts.add({
             interval: 0,
             priority: GLib.PRIORITY_DEFAULT_IDLE,
             fn: () => {
-                const event = this.#queue.shift();
+                const event = this.queue.shift();
 
                 if (event === undefined) {
-                    this.#queueIsProcessing = false;
+                    this.queueIsProcessing = false;
 
                     return GLib.SOURCE_REMOVE;
                 }
 
-                this.#subs.forEach((callbacks) => {
+                this.subs.forEach((callbacks) => {
                     callbacks.forEach((callback) => {
                         callback(event);
                     });
@@ -170,10 +168,7 @@ class EventGenerator {
         });
     }
 
-    /**
-     * @param {Meta.Window} window
-     */
-    #onWindowCreated(window) {
+    private onWindowCreated(window: Meta.Window) {
         if (window.get_window_type() !== Meta.WindowType.NORMAL) {
             return;
         }
@@ -182,18 +177,18 @@ class EventGenerator {
 
         windowActor.connectObject(
             "first-frame",
-            (actor) => this.#onWindowActorFirstFrame(actor),
+            (actor: Meta.WindowActor) => this.onWindowActorFirstFrame(actor),
             this,
         );
 
         window.connectObject(
             "unmanaging",
-            (w) => this.#onWindowUnmanaging(w),
+            (w: Meta.Window) => this.onWindowUnmanaging(w),
             this,
         );
     }
 
-    #onFocusWindowChanged() {
+    private onFocusWindowChanged() {
         const window = global.display.focus_window;
 
         if (window === null) {
@@ -204,296 +199,227 @@ class EventGenerator {
             return;
         }
 
-        Debug.log("Focus changed", window?.get_wm_class()).indentLog();
-        this.#generateEvent(new WindowFocusedEvent({ window }));
-        Debug.dedentLog();
+        this.generateEvent(new WindowFocusedEvent({ window }));
     }
 
-    #onWindowActorFirstFrame(windowActor) {
-        const window = windowActor.get_meta_window();
+    private onWindowActorFirstFrame(windowActor: Meta.WindowActor) {
+        const window = windowActor.get_meta_window() as Meta.Window;
 
-        Debug.log("First frame", window.get_wm_class()).indentLog();
-        this.#generateEvent(new WindowOpenedEvent({ window }));
-        Debug.dedentLog();
+        this.generateEvent(new WindowOpenedEvent({ window }));
 
         window.isTrackedByFloatingScroll = true;
     }
 
-    #onWindowUnmanaging(window) {
-        Debug.log("Unmanaging", window.get_wm_class()).indentLog();
-        this.#generateEvent(new WindowClosedEvent({ window }));
-        Debug.dedentLog();
+    private onWindowUnmanaging(window: Meta.Window) {
+        this.generateEvent(new WindowClosedEvent({ window }));
     }
 }
 
 class EventProcessor {
-    /** @type {Event} */
-    #records = [];
+    private records: Event[] = [];
 
     destroy() {
-        this.#records = [];
+        this.records = [];
     }
 
-    /**
-     * @param {Event} event
-     *
-     * @returns {import("./workspaceModel.js").WorkspaceModelChangeResult}
-     */
-    processEvent(event) {
-        if (this.#records.length > 10) {
-            this.#flushRecords();
+    processEvent(event: Event) {
+        if (this.records.length > 10) {
+            this.flushRecords();
         }
 
-        this.#records.push(event);
+        this.records.push(event);
 
         return event.process();
     }
 
-    #flushRecords() {
-        this.#records = [];
+    private flushRecords() {
+        this.records = [];
     }
 }
 
-class Event {
-    type = "Event";
-
-    /**
-     * @param {object} data
-     *
-     * @returns {import("./workspaceModel.js").WorkspaceModelChangeResult}
-     */
-    process(data) {
-        throw new Error(`Not implemented: ${data}`);
-    }
+interface Event {
+    type: string;
+    process(): Result<WorkspaceModel>;
 }
 
-class WindowOpenedEvent extends Event {
+class WindowOpenedEvent implements Event {
     type = "WindowOpenedEvent";
 
-    #data = null;
+    private readonly window: Meta.Window;
 
-    constructor(data) {
-        super();
-
-        this.#data = data;
+    constructor({ window }: { window: Meta.Window }) {
+        this.window = window;
     }
 
-    /**
-     * @returns {import("./workspaceModel.js").WorkspaceModelChangeResult}
-     */
     process() {
-        const { window } = this.#data;
         const workspaceModel = WorkspaceModelManager.getActiveWorkspaceModel();
-        const result = workspaceModel.insertWindow(
-            window,
-            Settings.getWindowOpeningPosition(),
-        );
+        const result = workspaceModel.insertWindow(this.window);
 
-        Debug.assert(result.ok, "Failed to insert window");
+        Debug.assert(result.isOk(), "Failed to insert window");
 
         return result;
     }
 }
 
-class WindowClosedEvent extends Event {
+class WindowClosedEvent implements Event {
     type = "WindowClosedEvent";
 
-    #data = null;
+    private readonly window: Meta.Window;
 
-    constructor(data) {
-        super();
-
-        this.#data = data;
+    constructor({ window }: { window: Meta.Window }) {
+        this.window = window;
     }
 
-    /**
-     * @returns {import("./workspaceModel.js").WorkspaceModelChangeResult}
-     */
     process() {
-        const { window } = this.#data;
         const workspaceModel = WorkspaceModelManager.getActiveWorkspaceModel();
         const result = workspaceModel.removeWindow(
-            window,
+            this.window,
             global.display.focus_window,
         );
 
-        Debug.assert(result.ok, "Failed to remove window");
+        Debug.assert(result.isOk(), "Failed to remove window");
 
         return result;
     }
 }
 
-class WindowFocusedEvent extends Event {
+class WindowFocusedEvent implements Event {
     type = "WindowFocusedEvent";
 
-    #data = null;
+    private readonly window: Meta.Window;
 
-    constructor(data) {
-        super();
-
-        this.#data = data;
+    constructor({ window }: { window: Meta.Window }) {
+        this.window = window;
     }
 
-    /**
-     * @returns {import("./workspaceModel.js").WorkspaceModelChangeResult}
-     */
     process() {
-        const { window } = this.#data;
         const workspaceModel = WorkspaceModelManager.getActiveWorkspaceModel();
-        const result = workspaceModel.relayout(window);
+        const result = workspaceModel.relayout(this.window);
 
-        Debug.assert(result.ok, "Failed to relayout");
+        Debug.assert(result.isOk(), "Failed to relayout");
 
         return result;
     }
 }
 
-class MoveFocusLeftShortcutEvent extends Event {
+class MoveFocusLeftShortcutEvent implements Event {
     type = "MoveFocusLeftShortcutEvent";
 
-    /**
-     * @returns {{ok: false}}
-     */
-    process() {
+    process(): Result<WorkspaceModel> {
         WorkspaceModelManager.getActiveWorkspaceModel()
             .getItemOnLeftOfFocus()
             ?.focus(global.get_current_time());
 
-        return { ok: false };
+        return Result.Err<WorkspaceModel>(
+            WorkspaceChangeResultErrors.ONLY_FOCUS,
+        );
     }
 }
 
-class MoveFocusRightShortcutEvent extends Event {
+class MoveFocusRightShortcutEvent implements Event {
     type = "MoveFocusRightShortcutEvent";
 
-    /**
-     * @returns {{ok: false}}
-     */
-    process() {
+    process(): Result<WorkspaceModel> {
         WorkspaceModelManager.getActiveWorkspaceModel()
             .getItemOnRightOfFocus()
             ?.focus(global.get_current_time());
 
-        return { ok: false };
+        return Result.Err<WorkspaceModel>(
+            WorkspaceChangeResultErrors.ONLY_FOCUS,
+        );
     }
 }
 
-class MoveFocusUpShortcutEvent extends Event {
+class MoveFocusUpShortcutEvent implements Event {
     type = "MoveFocusUpShortcutEvent";
 
-    /**
-     * @returns {{ok: false}}
-     */
-    process() {
+    process(): Result<WorkspaceModel> {
         WorkspaceModelManager.getActiveWorkspaceModel()
             .getItemAboveFocus()
             ?.focus(global.get_current_time());
 
-        return { ok: false };
+        return Result.Err<WorkspaceModel>(
+            WorkspaceChangeResultErrors.ONLY_FOCUS,
+        );
     }
 }
 
-class MoveFocusDownShortcutEvent extends Event {
+class MoveFocusDownShortcutEvent implements Event {
     type = "MoveFocusDownShortcutEvent";
 
-    /**
-     * @returns {{ok: false}}
-     */
-    process() {
+    process(): Result<WorkspaceModel> {
         WorkspaceModelManager.getActiveWorkspaceModel()
             .getItemBelowFocus()
             ?.focus(global.get_current_time());
 
-        return { ok: false };
+        return Result.Err<WorkspaceModel>(
+            WorkspaceChangeResultErrors.ONLY_FOCUS,
+        );
     }
 }
 
-class MoveColumnUpShortcutEvent extends Event {
+class MoveColumnUpShortcutEvent implements Event {
     type = "MoveColumnUpShortcutEvent";
 
-    /**
-     * @returns {import("./workspaceModel.js").WorkspaceModelChangeResult}
-     */
-    process() {
+    process(): Result<WorkspaceModel> {
         return WorkspaceModelManager.getActiveWorkspaceModel().moveFocusedColumnUp();
     }
 }
 
-class MoveColumnDownShortcutEvent extends Event {
+class MoveColumnDownShortcutEvent implements Event {
     type = "MoveColumnDownShortcutEvent";
 
-    /**
-     * @returns {import("./workspaceModel.js").WorkspaceModelChangeResult}
-     */
-    process() {
+    process(): Result<WorkspaceModel> {
         return WorkspaceModelManager.getActiveWorkspaceModel().moveFocusedColumnDown();
     }
 }
 
-class MoveColumnLeftShortcutEvent extends Event {
+class MoveColumnLeftShortcutEvent implements Event {
     type = "MoveColumnLeftShortcutEvent";
 
-    /**
-     * @returns {import("./workspaceModel.js").WorkspaceModelChangeResult}
-     */
     process() {
         return WorkspaceModelManager.getActiveWorkspaceModel().moveFocusedColumnLeft();
     }
 }
 
-class MoveColumnRightShortcutEvent extends Event {
+class MoveColumnRightShortcutEvent implements Event {
     type = "MoveColumnRightShortcutEvent";
 
-    /**
-     * @returns {import("./workspaceModel.js").WorkspaceModelChangeResult}
-     */
     process() {
         return WorkspaceModelManager.getActiveWorkspaceModel().moveFocusedColumnRight();
     }
 }
 
-class MoveItemUpShortcutEvent extends Event {
+class MoveItemUpShortcutEvent implements Event {
     type = "MoveItemUpShortcutEvent";
 
-    /**
-     * @returns {import("./workspaceModel.js").WorkspaceModelChangeResult}
-     */
     process() {
         return WorkspaceModelManager.getActiveWorkspaceModel().moveFocusedItemUp();
     }
 }
 
-class MoveItemDownShortcutEvent extends Event {
+class MoveItemDownShortcutEvent implements Event {
     type = "MoveItemDownShortcutEvent";
 
-    /**
-     * @returns {import("./workspaceModel.js").WorkspaceModelChangeResult}
-     */
     process() {
         return WorkspaceModelManager.getActiveWorkspaceModel().moveFocusedItemDown();
     }
 }
 
-class MoveItemLeftShortcutEvent extends Event {
+class MoveItemLeftShortcutEvent implements Event {
     type = "MoveItemLeftShortcutEvent";
 
-    /**
-     * @returns {import("./workspaceModel.js").WorkspaceModelChangeResult}
-     */
     process() {
         return WorkspaceModelManager.getActiveWorkspaceModel().moveFocusedItemLeft();
     }
 }
 
-class MoveItemRightShortcutEvent extends Event {
+class MoveItemRightShortcutEvent implements Event {
     type = "MoveItemRightShortcutEvent";
 
-    /**
-     * @returns {import("./workspaceModel.js").WorkspaceModelChangeResult}
-     */
     process() {
         return WorkspaceModelManager.getActiveWorkspaceModel().moveFocusedItemRight();
     }
 }
 
-export { EventGenerator, EventProcessor };
+export { type Event, EventGenerator, EventProcessor };

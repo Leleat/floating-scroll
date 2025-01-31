@@ -29,35 +29,42 @@ export class FsShortcutEditor extends Adw.Window {
         );
     }
 
-    /** @type {string} */
-    _currShortcutKey;
-    /** @type {string[]} */
-    _prevActivators;
-    /** @type {string} */
-    _currPrimaryActivator = "";
-    /** @type {string[]} */
-    _currSecondaryActivators = [];
+    declare _apply_button: Gtk.Button;
+    declare _preview_new_shortcut_label: Gtk.Label;
 
-    /**
-     * @param {object} param
-     * @param {string} param.shortcutName
-     * @param {string} param.shortcutKey
-     * @param {object} param.params
-     */
-    constructor({ shortcutName, shortcutKey, ...params }) {
+    private currShortcutKey: string;
+    private prevActivators: string[];
+    private currPrimaryActivator: string = "";
+    private currSecondaryActivators: {
+        keyval: number;
+        mask: Gdk.ModifierType;
+    }[] = [];
+
+    constructor({
+        shortcutName,
+        shortcutKey,
+        transient_for,
+        destroy_with_parent,
+    }: {
+        shortcutName: string;
+        shortcutKey: string;
+        transient_for: Adw.PreferencesWindow;
+        destroy_with_parent: true;
+    }) {
         super({
             title: shortcutName,
-            ...params,
+            transient_for,
+            destroy_with_parent,
         });
 
         const settings = getSettings();
 
-        this._currShortcutKey = shortcutKey;
-        this._prevActivators = settings.get_strv(shortcutKey);
+        this.currShortcutKey = shortcutKey;
+        this.prevActivators = settings.get_strv(shortcutKey);
 
-        const [primaryActivator, ...secondaryActivators] = this._prevActivators;
+        const [primaryActivator, ...secondaryActivators] = this.prevActivators;
 
-        this._setPreviewLabel({
+        this.setPreviewLabel({
             primaryActivator,
             secondaryActivators: secondaryActivators.map((s) => {
                 const [keyval, mask] = s.split("+").map(Number);
@@ -78,11 +85,11 @@ export class FsShortcutEditor extends Adw.Window {
         const settings = getSettings();
 
         settings.set_strv(
-            this._currShortcutKey,
-            this._currPrimaryActivator ?
+            this.currShortcutKey,
+            this.currPrimaryActivator ?
                 [
-                    this._currPrimaryActivator,
-                    ...this._currSecondaryActivators.map(
+                    this.currPrimaryActivator,
+                    ...this.currSecondaryActivators.map(
                         (s) => `${s.keyval}+${gdkToClutterMask(s.mask)}`,
                     ),
                 ]
@@ -92,15 +99,12 @@ export class FsShortcutEditor extends Adw.Window {
         this.close();
     }
 
-    /**
-     * @param {Gtk.EventController} eventController
-     * @param {number} keyval
-     * @param {number} keycode
-     * @param {Gdk.ModifierType} state
-     *
-     * @returns {Gdk.EVENT_STOP}
-     */
-    on_event_controller_key_pressed(_, keyval, keycode, state) {
+    on_event_controller_key_pressed(
+        eventController: Gtk.EventController,
+        keyval: number,
+        keycode: number,
+        state: Gdk.ModifierType,
+    ) {
         const mask =
             state &
             Gtk.accelerator_get_default_mod_mask() &
@@ -114,7 +118,7 @@ export class FsShortcutEditor extends Adw.Window {
                     return Gdk.EVENT_STOP;
                 case Gdk.KEY_BackSpace:
                     this._apply_button.set_sensitive(true);
-                    this._updateShortcuts({
+                    this.updateShortcuts({
                         primaryActivator: "",
                         secondaryActivators: [],
                     });
@@ -129,16 +133,16 @@ export class FsShortcutEditor extends Adw.Window {
             }
         }
 
-        if (this._currPrimaryActivator) {
+        if (this.currPrimaryActivator) {
             if (!Gtk.accelerator_valid(keyval, mask)) {
                 return Gdk.EVENT_STOP;
             }
 
             this._apply_button.set_sensitive(true);
 
-            this._updateShortcuts({
-                primaryActivator: this._currPrimaryActivator,
-                secondaryActivators: this._currSecondaryActivators.concat({
+            this.updateShortcuts({
+                primaryActivator: this.currPrimaryActivator,
+                secondaryActivators: this.currSecondaryActivators.concat({
                     keyval,
                     mask,
                 }),
@@ -150,7 +154,7 @@ export class FsShortcutEditor extends Adw.Window {
 
             this._apply_button.set_sensitive(true);
 
-            this._updateShortcuts({
+            this.updateShortcuts({
                 primaryActivator: Gtk.accelerator_name_with_keycode(
                     null,
                     keyval,
@@ -164,7 +168,13 @@ export class FsShortcutEditor extends Adw.Window {
         return Gdk.EVENT_STOP;
     }
 
-    _setPreviewLabel({ primaryActivator, secondaryActivators }) {
+    private setPreviewLabel({
+        primaryActivator,
+        secondaryActivators,
+    }: {
+        primaryActivator: string;
+        secondaryActivators: { keyval: number; mask: Gdk.ModifierType }[];
+    }) {
         if (primaryActivator) {
             const secondaryActivatorLabels = secondaryActivators.map((c) =>
                 Gtk.accelerator_get_label(c.keyval, c.mask),
@@ -186,15 +196,16 @@ export class FsShortcutEditor extends Adw.Window {
         }
     }
 
-    /**
-     * @param {object} param
-     * @param {string} param.primaryActivator
-     * @param {string[]} param.secondaryActivators
-     */
-    _updateShortcuts({ primaryActivator, secondaryActivators }) {
-        this._setPreviewLabel({ primaryActivator, secondaryActivators });
+    private updateShortcuts({
+        primaryActivator,
+        secondaryActivators,
+    }: {
+        primaryActivator: string;
+        secondaryActivators: { keyval: number; mask: Gdk.ModifierType }[];
+    }) {
+        this.setPreviewLabel({ primaryActivator, secondaryActivators });
 
-        this._currPrimaryActivator = primaryActivator;
-        this._currSecondaryActivators = secondaryActivators;
+        this.currPrimaryActivator = primaryActivator;
+        this.currSecondaryActivators = secondaryActivators;
     }
 }

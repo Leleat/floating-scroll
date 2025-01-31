@@ -2,16 +2,7 @@ import { Meta } from "../dependencies.js";
 
 import { WorkspaceModel } from "./workspaceModel.js";
 
-/**
- * @typedef {object} WorkspaceModelManager
- * @property {function(): void} destroy
- * @property {import("./workspaceModel.js").WorkspaceModel} getActiveWorkspaceModel
- * @property {function(import("./workspaceModel.js").WorkspaceModel): void} setActiveWorkspaceModel
- * @property {function(): Meta.Window[]} getWindows
- */
-
-/** @type {WorkspaceModelManager} */
-let SINGLETON = null;
+let SINGLETON: WorkspaceModelManager = null!;
 
 function enable() {
     SINGLETON = new WorkspaceModelManager();
@@ -19,12 +10,11 @@ function enable() {
 
 function disable() {
     SINGLETON.destroy();
-    SINGLETON = null;
+    SINGLETON = null!;
 }
 
 class WorkspaceModelManager {
-    /** @type {import("./workspaceModel.js").WorkspaceModel} */
-    #model = new WorkspaceModel({
+    private model = new WorkspaceModel({
         workspaceModelManager: this,
         workArea: global.workspace_manager // TODO update on change
             .get_active_workspace()
@@ -32,13 +22,10 @@ class WorkspaceModelManager {
     });
 
     destroy() {
-        this.#model.destroy();
-        this.#model = null;
+        this.model.destroy();
+        this.model = null!;
     }
 
-    /**
-     * @returns {Meta.Window[]}
-     */
     getWindows() {
         return global.display.get_tab_list(
             Meta.TabList.NORMAL_ALL,
@@ -46,18 +33,12 @@ class WorkspaceModelManager {
         );
     }
 
-    /**
-     * @returns {import("./workspaceModel.js").WorkspaceModel}
-     */
     getActiveWorkspaceModel() {
-        return this.#model;
+        return this.model;
     }
 
-    /**
-     * @param {import("./workspaceModel.js").WorkspaceModel} model
-     */
-    setActiveWorkspaceModel(model) {
-        this.#model = model;
+    setActiveWorkspaceModel(model: WorkspaceModel) {
+        this.model = model;
     }
 }
 

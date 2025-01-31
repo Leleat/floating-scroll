@@ -2,8 +2,7 @@ import { Gio, GLib } from "./dependencies.js";
 
 import { Settings } from "./utils/settings.js";
 
-/** @type {OverridesModule} */
-let MODULE = null;
+let MODULE: OverridesModule = null!;
 
 function enable() {
     MODULE = new OverridesModule();
@@ -11,7 +10,7 @@ function enable() {
 
 function disable() {
     MODULE.destroy();
-    MODULE = null;
+    MODULE = null!;
 }
 
 class OverridesModule {

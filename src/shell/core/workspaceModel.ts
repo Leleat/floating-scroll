@@ -1,35 +1,28 @@
+import { type Meta } from "../dependencies.js";
+
+import {
+    FocusBehavior,
+    Rect,
+    Result,
+    WindowOpeningPosition,
+} from "../../shared.js";
 import { Debug } from "../utils/debug.js";
 import { Settings } from "../utils/settings.js";
+import { type WorkspaceModelManager } from "./workspaceModelManager.js";
 
-/** @typedef {{x: number, y: number, width: number, height: number}} Rect */
-/** @typedef {Item} Item */
-/** @typedef {Column} Column */
-/** @typedef {WorkspaceGrid} WorkspaceGrid */
-/** @typedef {WorkspaceModelChangeResult} WorkspaceModelChangeResult */
-
-const FocusBehavior = Object.freeze({
-    CENTER: 0,
-    LAZY_FOLLOW: 1,
+const WorkspaceChangeResultErrors = Object.freeze({
+    NO_WINDOW: 1,
+    /** rely on the focus signal to relayout, so ignore this */
+    ONLY_FOCUS: 2,
 });
 
-const WindowOpeningPosition = Object.freeze({
-    LEFT: 0,
-    RIGHT: 1,
-    BETWEEN_MRU: 2,
-});
+type WorkspaceChangeResultErrors =
+    (typeof WorkspaceChangeResultErrors)[keyof typeof WorkspaceChangeResultErrors];
 
 class Item {
-    /** @type {Meta.Window} */
-    #value;
+    public readonly value!: Meta.Window;
+    public readonly rect!: Rect;
 
-    /** @type {Rect} */
-    #rect;
-
-    /**
-     * @param {object} param
-     * @param {Meta.Window} param.value
-     * @param {Rect} param.rect
-     */
     constructor({
         value,
         rect = {
@@ -38,135 +31,96 @@ class Item {
             width: 0,
             height: 0,
         },
-    } = {}) {
+    }: {
+        value: Meta.Window;
+        rect?: Rect;
+    }) {
         Debug.assert(
             value !== undefined,
             "Value must be defined (eg a Window).",
         );
 
-        this.#value = value;
-        this.#rect = rect;
-    }
-
-    get value() {
-        return this.#value;
-    }
-
-    get rect() {
-        return this.#rect;
+        this.value = value;
+        this.rect = rect;
     }
 
     destroy() {
-        this.#value = null;
-        this.#rect = null;
+        // @ts-expect-error null out
+        this.value = null;
+        // @ts-expect-error null out
+        this.rect = null;
     }
 
-    /**
-     * @param {object} [param]
-     * @param {Meta.Window} [param.value]
-     * @param {Rect} [param.rect]
-     *
-     * @returns {Item}
-     */
-    clone({ value = this.#value, rect = this.#rect } = {}) {
-        return new Item({ value, rect: { ...this.#rect, ...rect } });
+    clone({
+        value = this.value,
+        rect = this.rect,
+    }: {
+        value?: Meta.Window;
+        rect?: { x?: number; y?: number; width?: number; height?: number };
+    } = {}) {
+        return new Item({ value, rect: { ...this.rect, ...rect } });
     }
 
-    /**
-     * @param {*} v
-     *
-     * @returns {boolean}
-     */
-    contains(v) {
-        return v === this.#value;
+    contains(v: Meta.Window) {
+        return v === this.value;
     }
 
-    /**
-     * @param {Item} otherItem
-     *
-     * @returns {boolean}
-     */
-    equals(otherItem) {
-        return this.#value === otherItem.value;
+    equals(otherItem: Item) {
+        return this.value === otherItem.value;
     }
 
-    /** @returns {Meta.Window} */
     getFocusedWindow() {
-        return this.#value;
+        return this.value;
     }
 
     sync() {
-        const workArea = this.#value.get_work_area_current_monitor();
-        const windowActor = this.#value.get_compositor_private();
+        const workArea = this.value.get_work_area_current_monitor();
+        const windowActor =
+            this.value.get_compositor_private() as Meta.WindowActor;
 
         // Windows cant be moved offscreen entirely: https://gitlab.gnome.org/GNOME/mutter/-/blob/main/src/core/constraints.c.
         // So just hide the actor if the window is meant to be offscreen but
         // constrained to be onscreen by mutter.
         const offScreenLimit = 75;
         const isOffScreen =
-            this.#rect.x + this.#rect.width <= offScreenLimit ||
-            this.#rect.x >= workArea.x + workArea.width - offScreenLimit;
+            this.rect.x + this.rect.width <= offScreenLimit ||
+            this.rect.x >= workArea.x + workArea.width - offScreenLimit;
 
         if (isOffScreen) {
             windowActor.hide();
         } else {
             windowActor.show();
-            this.#value.move_resize_frame(
+            this.value.move_resize_frame(
                 true,
-                workArea.x + this.#rect.x,
-                workArea.y + this.#rect.y,
-                this.#rect.width,
-                this.#rect.height,
+                workArea.x + this.rect.x,
+                workArea.y + this.rect.y,
+                this.rect.width,
+                this.rect.height,
             );
         }
     }
 }
 
 class Column {
-    /** @type {number} */
-    #focusedItem;
+    readonly focusedItem: number = 0;
+    readonly items: Item[] = [];
+    readonly rect: Rect;
 
-    /** @type {Item[]} */
-    #items;
-
-    /** @type {Rect} */
-    #rect;
-
-    get focusedItem() {
-        return this.#focusedItem;
-    }
-
-    get items() {
-        return this.#items;
-    }
-
-    get rect() {
-        return this.#rect;
-    }
-
-    /**
-     * @param {object} param
-     * @param {Item[]} param.items
-     * @param {number} param.focusedItem
-     */
-    constructor({ items = [], focusedItem = 0 } = {}) {
+    constructor({
+        items = [],
+        focusedItem = 0,
+    }: {
+        items?: Item[];
+        focusedItem?: number;
+    } = {}) {
         Debug.assert(
-            Array.isArray(items) &&
-                items.every((item) => item instanceof Item) &&
-                items.length > 0,
-            `Columns must have at least one item: ${items}`,
-        );
-
-        Debug.assert(
-            Number.isInteger(focusedItem) &&
-                focusedItem >= 0 &&
-                focusedItem < items.length,
+            focusedItem >= 0 && focusedItem < items.length,
             `focus must be a valid index: ${focusedItem}`,
         );
 
-        this.#focusedItem = focusedItem;
-        this.#items = items;
-        this.#rect = items.reduce(
+        this.focusedItem = focusedItem;
+        this.items = items;
+        this.rect = items.reduce(
             (acc, item) => {
                 return {
                     x: Math.min(acc.x, item.rect.x),
@@ -185,63 +139,41 @@ class Column {
     }
 
     destroy() {
-        this.#focusedItem = null;
-        this.#items.forEach((item) => item.destroy());
-        this.#items = null;
-        this.#rect = null;
+        // @ts-expect-error null out
+        this.focusedItem = null;
+        this.items.forEach((item) => item.destroy());
+        // @ts-expect-error null out
+        this.items = null;
+        // @ts-expect-error null out
+        this.rect = null;
     }
 
-    /**
-     * @param {object} [param]
-     * @param {Item[]} [param.items]
-     * @param {number} [param.focusedItem]
-     *
-     * @returns {Column}
-     */
     clone({
-        items = this.#items.map((i) => i.clone()),
-        focusedItem = this.#focusedItem,
+        items = this.items.map((i) => i.clone()),
+        focusedItem = this.focusedItem,
     } = {}) {
         return new Column({ items, focusedItem });
     }
 
-    /**
-     * @param {*} v
-     *
-     * @returns {boolean}
-     */
-    contains(v) {
-        return this.#items.some((item) => item.contains(v));
+    contains(v: Meta.Window) {
+        return this.items.some((item) => item.contains(v));
     }
 
-    /**
-     * @param {Column} otherCol
-     *
-     * @returns {boolean}
-     */
-    equals(otherCol) {
+    equals(otherCol: Column) {
         return (
-            this.#items.length === otherCol.items.length &&
-            this.#items.every((item, i) => item.equals(otherCol.items[i]))
+            this.items.length === otherCol.items.length &&
+            this.items.every((item, i) => item.equals(otherCol.items[i]))
         );
     }
 
-    /** @returns {Item} */
     getFocusedItem() {
-        return this.#items[this.#focusedItem];
+        return this.items[this.focusedItem];
     }
 
-    /**
-     * @param {object} [param]
-     * @param {number} [param.dx]
-     * @param {number} [param.dy]
-     *
-     * @returns {Column}
-     */
     shift({ dx = 0, dy = 0 } = {}) {
         return new Column({
-            focusedItem: this.#focusedItem,
-            items: this.#items.map((item) => {
+            focusedItem: this.focusedItem,
+            items: this.items.map((item) => {
                 return item.clone({
                     rect: { x: item.rect.x + dx, y: item.rect.y + dy },
                 });
@@ -250,108 +182,33 @@ class Column {
     }
 }
 
-class WorkspaceModelChangeResult {
-    /** @type {boolean} */
-    #ok;
-
-    /** @type {WorkspaceModel|undefined} */
-    #model;
-
-    constructor({ ok, model = undefined } = {}) {
-        this.#ok = ok;
-        this.#model = model;
-    }
-
-    get ok() {
-        return this.#ok;
-    }
-
-    get model() {
-        return this.#model;
-    }
-}
-
 class WorkspaceGrid {
-    /** @type {Item[][]} */
-    #items;
+    readonly items: Item[][];
+    readonly workArea: Rect;
 
-    /** @type {Rect} */
-    #workArea;
-
-    get items() {
-        return this.#items;
-    }
-
-    get workArea() {
-        return this.#workArea;
-    }
-
-    /**
-     * @param {object} param
-     * @param {Item[][]} param.items
-     * @param {Rect} param.workArea
-     */
-    constructor({
-        items = [],
-        workArea = {
-            x: 0,
-            y: 0,
-            width: 0,
-            height: 0,
-        },
-    } = {}) {
-        this.#items = items;
-        this.#workArea = workArea;
+    constructor({ items, workArea }: { items: Item[][]; workArea: Rect }) {
+        this.items = items;
+        this.workArea = workArea;
     }
 }
 
 class WorkspaceModel {
-    /** @type {Column[]} */
-    #columns;
+    readonly columns: Column[];
+    readonly focusedColumn: number | undefined;
+    readonly workArea: Rect;
+    readonly workspaceModelManager: typeof WorkspaceModelManager;
 
-    /** @type {number|undefined} */
-    #focusedColumn;
-
-    /** @type {Rect} */
-    #workArea;
-
-    /** @type {WorkspaceModelManager} */
-    #workspaceModelManager;
-
-    get columns() {
-        return this.#columns;
-    }
-
-    get focusedColumn() {
-        return this.#focusedColumn;
-    }
-
-    get workArea() {
-        return this.#workArea;
-    }
-
-    get workspaceModelManager() {
-        return this.#workspaceModelManager;
-    }
-
-    /**
-     * @param {object} param
-     * @param {WorkspaceModelManager} param.workspaceModelManager
-     * @param {Column[]} param.columns
-     * @param {number|undefined} param.focusedColumn
-     * @param {Rect} param.workArea
-     */
     constructor({
         workspaceModelManager,
         columns = [],
         focusedColumn,
-        workArea = {
-            x: 0,
-            y: 0,
-            width: 0,
-            height: 0,
-        },
-    } = {}) {
+        workArea,
+    }: {
+        workspaceModelManager: typeof WorkspaceModelManager;
+        columns?: Column[];
+        focusedColumn?: number;
+        workArea: Rect;
+    }) {
         Debug.assert(
             Array.isArray(columns) &&
                 columns.every((col) => col instanceof Column),
@@ -366,21 +223,21 @@ class WorkspaceModel {
             `focus must be a valid index: ${focusedColumn}`,
         );
 
-        this.#workspaceModelManager = workspaceModelManager;
-        this.#columns = columns;
-        this.#focusedColumn = focusedColumn;
-        this.#workArea = workArea;
+        this.workspaceModelManager = workspaceModelManager;
+        this.columns = columns;
+        this.focusedColumn = focusedColumn;
+        this.workArea = workArea;
     }
 
     destroy() {
-        this.#columns.forEach((col) => col.destroy());
+        this.columns.forEach((col) => col.destroy());
     }
 
     clone({
-        focusedColumn = this.#focusedColumn,
-        columns = this.#columns.map((col) => col.clone()),
-        workArea = this.#workArea,
-        workspaceModelManager = this.#workspaceModelManager,
+        focusedColumn = this.focusedColumn,
+        columns = this.columns.map((col) => col.clone()),
+        workArea = this.workArea,
+        workspaceModelManager = this.workspaceModelManager,
     } = {}) {
         return new WorkspaceModel({
             workspaceModelManager,
@@ -390,64 +247,60 @@ class WorkspaceModel {
         });
     }
 
-    /** @returns {WorkspaceGrid} */
     getGrid() {
         return new WorkspaceGrid({
-            workArea: this.#workArea,
-            items: this.#columns.map((col) => {
+            workArea: this.workArea,
+            items: this.columns.map((col) => {
                 return col.items.map((item) => item.clone());
             }),
         });
     }
 
     /**
-     * @param {Meta.Window|null|undefined} window - the window to focus on
-     *
-     * @returns {WorkspaceModelChangeResult}
+     * @param window may be null if there is no focused window, undefined if
+     *      we relayout without a focus change
      */
-    relayout(window) {
+    relayout(window: Meta.Window | null | undefined): Result<WorkspaceModel> {
         if (window === null || window === undefined) {
             Debug.assert(
-                this.#columns.length === 0,
+                this.columns.length === 0,
                 "Workspace isn't empty. Missing window to focus on.",
             );
 
-            return new WorkspaceModelChangeResult({
-                ok: true,
-                model: new WorkspaceModel({
-                    workArea: this.#workArea,
-                    workspaceModelManager: this.#workspaceModelManager,
+            return Result.Ok<WorkspaceModel>(
+                new WorkspaceModel({
+                    workArea: this.workArea,
+                    workspaceModelManager: this.workspaceModelManager,
                 }),
-            });
+            );
         }
 
         const { focusedColumn: newFocusedColumn, focusedItem: newFocusItem } =
-            this.#findFocusedIndices(window);
+            this.findFocusedIndices(window);
 
         Debug.assert(
             newFocusedColumn !== undefined && newFocusItem !== undefined,
             `Window not found in workspace: ${window}`,
         );
 
-        const mrus = this.#workspaceModelManager.getWindows();
+        const mrus = this.workspaceModelManager.getWindows();
         const placedCols = calculatePlacementOnMainAxis(
             newFocusedColumn,
-            this.#columns,
+            this.columns,
             mrus,
-            this.#workArea,
+            this.workArea,
         );
         const placedFocusedCol = placedCols[newFocusedColumn];
         const placedItems = calculatePlacementOnCrossAxis(
             newFocusItem,
             placedFocusedCol.items,
             mrus,
-            this.#workArea,
+            this.workArea,
         );
 
-        return new WorkspaceModelChangeResult({
-            ok: true,
-            model: new WorkspaceModel({
-                workspaceModelManager: this.#workspaceModelManager,
+        return Result.Ok<WorkspaceModel>(
+            new WorkspaceModel({
+                workspaceModelManager: this.workspaceModelManager,
                 columns: placedCols.with(
                     newFocusedColumn,
                     new Column({
@@ -456,43 +309,40 @@ class WorkspaceModel {
                     }),
                 ),
                 focusedColumn: newFocusedColumn,
-                workArea: this.#workArea,
+                workArea: this.workArea,
             }),
-        });
+        );
     }
 
-    /** @returns {Meta.Window|undefined} */
     getItemOnLeftOfFocus() {
-        if (this.#focusedColumn === undefined || this.#focusedColumn === 0) {
+        if (this.focusedColumn === undefined || this.focusedColumn === 0) {
             return undefined;
         }
 
-        const newCol = this.#columns[this.#focusedColumn - 1];
+        const newCol = this.columns[this.focusedColumn - 1];
 
         return newCol.getFocusedItem().value;
     }
 
-    /** @returns {Meta.Window|undefined} */
     getItemOnRightOfFocus() {
         if (
-            this.#focusedColumn === undefined ||
-            this.#focusedColumn === this.#columns.length - 1
+            this.focusedColumn === undefined ||
+            this.focusedColumn === this.columns.length - 1
         ) {
             return undefined;
         }
 
-        const newCol = this.#columns[this.#focusedColumn + 1];
+        const newCol = this.columns[this.focusedColumn + 1];
 
         return newCol.getFocusedItem().value;
     }
 
-    /** @returns {Meta.Window|undefined} */
     getItemAboveFocus() {
-        if (this.#focusedColumn === undefined) {
+        const currColumn = this.getFocusedColumn();
+
+        if (currColumn === undefined) {
             return undefined;
         }
-
-        const currColumn = this.#getFocusedColumn();
 
         if (currColumn.focusedItem === 0) {
             return undefined;
@@ -501,13 +351,12 @@ class WorkspaceModel {
         return currColumn.items[currColumn.focusedItem - 1].value;
     }
 
-    /** @returns {Meta.Window|undefined} */
     getItemBelowFocus() {
-        if (this.#focusedColumn === undefined) {
+        const currColumn = this.getFocusedColumn();
+
+        if (currColumn === undefined) {
             return undefined;
         }
-
-        const currColumn = this.#getFocusedColumn();
 
         if (currColumn.focusedItem >= currColumn.items.length - 1) {
             return undefined;
@@ -516,81 +365,97 @@ class WorkspaceModel {
         return currColumn.items[currColumn.focusedItem + 1].value;
     }
 
-    /** @returns {WorkspaceModelChangeResult} */
-    moveFocusedColumnUp() {
+    moveFocusedColumnUp(): Result<WorkspaceModel> {
         // TODO multi-workspace movement
+        return Result.Err<WorkspaceModel>(
+            WorkspaceChangeResultErrors.NO_WINDOW,
+        );
     }
 
-    /** @returns {WorkspaceModelChangeResult} */
-    moveFocusedColumnDown() {
+    moveFocusedColumnDown(): Result<WorkspaceModel> {
         // TODO multi-workspace movement
+        return Result.Err<WorkspaceModel>(
+            WorkspaceChangeResultErrors.NO_WINDOW,
+        );
     }
 
-    /** @returns {WorkspaceModelChangeResult} */
-    moveFocusedColumnLeft() {
-        if (this.#focusedColumn === undefined || this.#focusedColumn === 0) {
-            return new WorkspaceModelChangeResult({ ok: false });
-        }
+    moveFocusedColumnLeft(): Result<WorkspaceModel> {
+        const col = this.getFocusedColumn();
 
-        const col = this.#getFocusedColumn();
-        const window = col.items[col.focusedItem].value;
-        const model = new WorkspaceModel({
-            workspaceModelManager: this.#workspaceModelManager,
-            workArea: this.#workArea,
-            columns: [
-                ...this.#columns.slice(0, this.#focusedColumn - 1),
-                this.#columns[this.#focusedColumn],
-                this.#columns[this.#focusedColumn - 1],
-                ...this.#columns.slice(this.#focusedColumn + 1),
-            ],
-        });
-
-        return model.relayout(window);
-    }
-
-    /** @returns {WorkspaceModelChangeResult} */
-    moveFocusedColumnRight() {
         if (
-            this.#focusedColumn === undefined ||
-            this.#focusedColumn >= this.#columns.length - 1
+            col === undefined ||
+            this.focusedColumn === undefined ||
+            this.focusedColumn === 0
         ) {
-            return new WorkspaceModelChangeResult({ ok: false });
+            return Result.Err<WorkspaceModel>(
+                WorkspaceChangeResultErrors.NO_WINDOW,
+            );
         }
 
-        const col = this.#getFocusedColumn();
         const window = col.items[col.focusedItem].value;
         const model = new WorkspaceModel({
-            workspaceModelManager: this.#workspaceModelManager,
-            workArea: this.#workArea,
+            workspaceModelManager: this.workspaceModelManager,
+            workArea: this.workArea,
             columns: [
-                ...this.#columns.slice(0, this.#focusedColumn),
-                this.#columns[this.#focusedColumn + 1],
-                this.#columns[this.#focusedColumn],
-                ...this.#columns.slice(this.#focusedColumn + 2),
+                ...this.columns.slice(0, this.focusedColumn - 1),
+                this.columns[this.focusedColumn],
+                this.columns[this.focusedColumn - 1],
+                ...this.columns.slice(this.focusedColumn + 1),
             ],
         });
 
         return model.relayout(window);
     }
 
-    /** @returns {WorkspaceModelChangeResult} */
-    moveFocusedItemUp() {
-        if (this.#focusedColumn === undefined) {
-            return new WorkspaceModelChangeResult({ ok: false });
+    moveFocusedColumnRight(): Result<WorkspaceModel> {
+        const col = this.getFocusedColumn();
+
+        if (
+            col === undefined ||
+            this.focusedColumn === undefined ||
+            this.focusedColumn >= this.columns.length - 1
+        ) {
+            return Result.Err<WorkspaceModel>(
+                WorkspaceChangeResultErrors.NO_WINDOW,
+            );
         }
 
-        const currColumn = this.#getFocusedColumn();
+        const window = col.items[col.focusedItem].value;
+        const model = new WorkspaceModel({
+            workspaceModelManager: this.workspaceModelManager,
+            workArea: this.workArea,
+            columns: [
+                ...this.columns.slice(0, this.focusedColumn),
+                this.columns[this.focusedColumn + 1],
+                this.columns[this.focusedColumn],
+                ...this.columns.slice(this.focusedColumn + 2),
+            ],
+        });
+
+        return model.relayout(window);
+    }
+
+    moveFocusedItemUp(): Result<WorkspaceModel> {
+        const currColumn = this.getFocusedColumn();
+
+        if (currColumn === undefined || this.focusedColumn === undefined) {
+            return Result.Err<WorkspaceModel>(
+                WorkspaceChangeResultErrors.NO_WINDOW,
+            );
+        }
 
         if (currColumn.focusedItem === 0) {
-            return new WorkspaceModelChangeResult({ ok: false });
+            return Result.Err<WorkspaceModel>(
+                WorkspaceChangeResultErrors.NO_WINDOW,
+            );
         }
 
         const model = new WorkspaceModel({
-            workspaceModelManager: this.#workspaceModelManager,
-            workArea: this.#workArea,
-            focusedColumn: this.#focusedColumn,
-            columns: this.#columns.with(
-                this.#focusedColumn,
+            workspaceModelManager: this.workspaceModelManager,
+            workArea: this.workArea,
+            focusedColumn: this.focusedColumn,
+            columns: this.columns.with(
+                this.focusedColumn,
                 new Column({
                     focusedItem: currColumn.focusedItem - 1,
                     items: [
@@ -609,24 +474,27 @@ class WorkspaceModel {
         return model.relayout(currColumn.items[currColumn.focusedItem].value);
     }
 
-    /** @returns {WorkspaceModelChangeResult} */
-    moveFocusedItemDown() {
-        if (this.#focusedColumn === undefined) {
-            return new WorkspaceModelChangeResult({ ok: false });
+    moveFocusedItemDown(): Result<WorkspaceModel> {
+        const currColumn = this.getFocusedColumn();
+
+        if (currColumn === undefined || this.focusedColumn === undefined) {
+            return Result.Err<WorkspaceModel>(
+                WorkspaceChangeResultErrors.NO_WINDOW,
+            );
         }
 
-        const currColumn = this.#getFocusedColumn();
-
         if (currColumn.focusedItem >= currColumn.items.length - 1) {
-            return new WorkspaceModelChangeResult({ ok: false });
+            return Result.Err<WorkspaceModel>(
+                WorkspaceChangeResultErrors.NO_WINDOW,
+            );
         }
 
         const model = new WorkspaceModel({
-            workspaceModelManager: this.#workspaceModelManager,
-            workArea: this.#workArea,
-            focusedColumn: this.#focusedColumn,
-            columns: this.#columns.with(
-                this.#focusedColumn,
+            workspaceModelManager: this.workspaceModelManager,
+            workArea: this.workArea,
+            focusedColumn: this.focusedColumn,
+            columns: this.columns.with(
+                this.focusedColumn,
                 new Column({
                     focusedItem: currColumn.focusedItem + 1,
                     items: [
@@ -642,18 +510,20 @@ class WorkspaceModel {
         return model.relayout(currColumn.items[currColumn.focusedItem].value);
     }
 
-    /** @returns {WorkspaceModelChangeResult} */
-    moveFocusedItemLeft() {
+    moveFocusedItemLeft(): Result<WorkspaceModel> {
+        const fromColumn = this.getFocusedColumn();
+
         if (
-            this.#focusedColumn === undefined ||
-            (this.#focusedColumn === 0 &&
-                this.#getFocusedColumn().items.length === 1)
+            this.focusedColumn === undefined ||
+            fromColumn === undefined ||
+            (this.focusedColumn === 0 && fromColumn.items.length === 1)
         ) {
-            return new WorkspaceModelChangeResult({ ok: false });
+            return Result.Err<WorkspaceModel>(
+                WorkspaceChangeResultErrors.NO_WINDOW,
+            );
         }
 
-        const fromColumn = this.#getFocusedColumn();
-        const maybeToColumn = this.#columns[this.#focusedColumn - 1];
+        const maybeToColumn = this.columns[this.focusedColumn - 1];
         const toColumn =
             maybeToColumn?.clone({
                 focusedItem: maybeToColumn.items.length,
@@ -669,17 +539,17 @@ class WorkspaceModel {
             0,
             fromColumn.focusedItem - 1,
         );
-        const newFocusedColumn = Math.max(0, this.#focusedColumn - 1);
+        const newFocusedColumn = Math.max(0, this.focusedColumn - 1);
         const fromColumnWasEmptied = fromColumn.items.length === 1;
         const newColumns =
             fromColumnWasEmptied ?
                 [
-                    ...this.#columns.slice(0, newFocusedColumn),
+                    ...this.columns.slice(0, newFocusedColumn),
                     toColumn,
-                    ...this.#columns.slice(this.#focusedColumn + 1),
+                    ...this.columns.slice(this.focusedColumn + 1),
                 ]
             :   [
-                    ...this.#columns.slice(0, newFocusedColumn),
+                    ...this.columns.slice(0, newFocusedColumn),
                     toColumn,
                     new Column({
                         focusedItem: focusedItemInNewFromColumn,
@@ -689,33 +559,36 @@ class WorkspaceModel {
                                 fromColumn.focusedItem,
                                 1,
                             ),
-                            this.#workspaceModelManager.getWindows(),
-                            this.#workArea,
+                            this.workspaceModelManager.getWindows(),
+                            this.workArea,
                         ),
                     }),
-                    ...this.#columns.slice(this.#focusedColumn + 1),
+                    ...this.columns.slice(this.focusedColumn + 1),
                 ];
 
         return new WorkspaceModel({
             columns: newColumns,
-            workspaceModelManager: this.#workspaceModelManager,
+            workspaceModelManager: this.workspaceModelManager,
             focusedColumn: newFocusedColumn,
-            workArea: this.#workArea,
+            workArea: this.workArea,
         }).relayout(window);
     }
 
-    /** @returns {WorkspaceModelChangeResult} */
-    moveFocusedItemRight() {
+    moveFocusedItemRight(): Result<WorkspaceModel> {
+        const fromColumn = this.getFocusedColumn();
+
         if (
-            this.#focusedColumn === undefined ||
-            (this.#focusedColumn === this.#columns.length - 1 &&
-                this.#getFocusedColumn().items.length === 1)
+            this.focusedColumn === undefined ||
+            fromColumn === undefined ||
+            (this.focusedColumn === this.columns.length - 1 &&
+                fromColumn.items.length === 1)
         ) {
-            return new WorkspaceModelChangeResult({ ok: false });
+            return Result.Err<WorkspaceModel>(
+                WorkspaceChangeResultErrors.NO_WINDOW,
+            );
         }
 
-        const fromColumn = this.#getFocusedColumn();
-        const maybeToColumn = this.#columns[this.#focusedColumn + 1];
+        const maybeToColumn = this.columns[this.focusedColumn + 1];
         const toColumn =
             maybeToColumn?.clone({
                 focusedItem: maybeToColumn.items.length,
@@ -735,12 +608,12 @@ class WorkspaceModel {
         const newColumns =
             fromColumnWasEmtpied ?
                 [
-                    ...this.#columns.slice(0, this.#focusedColumn),
+                    ...this.columns.slice(0, this.focusedColumn),
                     toColumn,
-                    ...this.#columns.slice(this.#focusedColumn + 2),
+                    ...this.columns.slice(this.focusedColumn + 2),
                 ]
             :   [
-                    ...this.#columns.slice(0, this.#focusedColumn),
+                    ...this.columns.slice(0, this.focusedColumn),
                     new Column({
                         focusedItem: focusedItemInNewFromColumn,
                         items: calculatePlacementOnCrossAxis(
@@ -749,32 +622,27 @@ class WorkspaceModel {
                                 fromColumn.focusedItem,
                                 1,
                             ),
-                            this.#workspaceModelManager.getWindows(),
-                            this.#workArea,
+                            this.workspaceModelManager.getWindows(),
+                            this.workArea,
                         ),
                     }),
                     toColumn,
-                    ...this.#columns.slice(this.#focusedColumn + 2),
+                    ...this.columns.slice(this.focusedColumn + 2),
                 ];
 
-        const addedANewColumn = newColumns.length > this.#columns.length;
+        const addedANewColumn = newColumns.length > this.columns.length;
 
         return new WorkspaceModel({
             columns: newColumns,
-            workspaceModelManager: this.#workspaceModelManager,
-            workArea: this.#workArea,
-            focusedColumn: this.#focusedColumn + (addedANewColumn ? 1 : 0),
+            workspaceModelManager: this.workspaceModelManager,
+            workArea: this.workArea,
+            focusedColumn: this.focusedColumn + (addedANewColumn ? 1 : 0),
         }).relayout(window);
     }
 
-    /**
-     * @param {Meta.Window} window
-     *
-     * @returns {WorkspaceModelChangeResult}
-     */
-    insertWindow(window) {
+    insertWindow(window: Meta.Window): Result<WorkspaceModel> {
         Debug.assert(
-            this.#columns.every(
+            this.columns.every(
                 (col) => col.items.every((item) => item.value !== window),
                 `Window (${window}) already in workspace`,
             ),
@@ -782,7 +650,7 @@ class WorkspaceModel {
 
         let cols;
         const openingPosition = Settings.getWindowOpeningPosition();
-        const mrus = this.#workspaceModelManager
+        const mrus = this.workspaceModelManager
             .getWindows()
             .filter((w) => w !== window);
 
@@ -790,54 +658,52 @@ class WorkspaceModel {
             cols = insertWindowOnLeftOfFocus(
                 window,
                 mrus,
-                this.#columns,
-                this.#focusedColumn,
-                this.#workArea,
+                this.columns,
+                this.focusedColumn,
+                this.workArea,
             );
         } else if (openingPosition === WindowOpeningPosition.RIGHT) {
             cols = insertWindowOnRightOfFocus(
                 window,
                 mrus,
-                this.#columns,
-                this.#focusedColumn,
-                this.#workArea,
+                this.columns,
+                this.focusedColumn,
+                this.workArea,
             );
         } else if (openingPosition === WindowOpeningPosition.BETWEEN_MRU) {
             cols = insertWindowBetweenMrus(
                 window,
                 mrus,
-                this.#columns,
-                this.#focusedColumn,
-                this.#workArea,
+                this.columns,
+                this.focusedColumn,
+                this.workArea,
             );
         } else {
-            throw new Error(
+            Debug.assert(
+                false,
                 `Unknown window opening position: ${openingPosition}`,
             );
         }
 
         return new WorkspaceModel({
-            workspaceModelManager: this.#workspaceModelManager,
-            workArea: this.#workArea,
+            workspaceModelManager: this.workspaceModelManager,
+            workArea: this.workArea,
             columns: cols,
         }).relayout(window);
     }
 
-    /**
-     * @param {Meta.Window} window - window in the workspace model to remove
-     * @param {Meta.Window|undefined} newFocus - window to focus on after removal
-     *
-     * @returns {WorkspaceModelChangeResult}
-     */
-    removeWindow(window, newFocus) {
+    removeWindow(
+        window: Meta.Window,
+        newFocus: Meta.Window | undefined,
+    ): Result<WorkspaceModel> {
         const noNewFocus = newFocus === undefined || newFocus === null;
 
         Debug.assert(
-            newFocus || (noNewFocus && this.#columns.length === 1),
+            !!newFocus || (noNewFocus && this.columns.length === 1),
             "Missing window to focus on after removal",
         );
 
-        const column = this.#columns.find((column) => column.contains(window));
+        const column = this.columns.find((column) => column.contains(window));
 
         Debug.assert(
             column !== undefined,
@@ -846,9 +712,9 @@ class WorkspaceModel {
 
         if (column.items.length === 1) {
             return new WorkspaceModel({
-                workspaceModelManager: this.#workspaceModelManager,
-                workArea: this.#workArea,
-                columns: this.#columns.filter((col) => col !== column),
+                workspaceModelManager: this.workspaceModelManager,
+                workArea: this.workArea,
+                columns: this.columns.filter((col) => col !== column),
             }).relayout(newFocus);
         }
 
@@ -860,31 +726,26 @@ class WorkspaceModel {
             items: calculatePlacementOnCrossAxis(
                 focusedItem,
                 items,
-                this.#workspaceModelManager.getWindows(),
-                this.#workArea,
+                this.workspaceModelManager.getWindows(),
+                this.workArea,
             ),
         });
 
         return new WorkspaceModel({
-            workspaceModelManager: this.#workspaceModelManager,
-            workArea: this.#workArea,
-            columns: this.#columns.with(
-                this.#columns.indexOf(column),
-                newColumn,
-            ),
+            workspaceModelManager: this.workspaceModelManager,
+            workArea: this.workArea,
+            columns: this.columns.with(this.columns.indexOf(column), newColumn),
         }).relayout(newFocus);
     }
 
-    /**
-     * @param {Meta.Window} window
-     *
-     * @returns {{newFocusedColumn: number|undefined, newFocusedItem: number|undefined}}
-     */
-    #findFocusedIndices(window) {
-        const indices = { focusedColumn: undefined, focusedItem: undefined };
+    private findFocusedIndices(window: Meta.Window) {
+        const indices: {
+            focusedColumn: number | undefined;
+            focusedItem: number | undefined;
+        } = { focusedColumn: undefined, focusedItem: undefined };
 
-        for (let colIndex = 0; colIndex < this.#columns.length; colIndex++) {
-            const column = this.#columns[colIndex];
+        for (let colIndex = 0; colIndex < this.columns.length; colIndex++) {
+            const column = this.columns[colIndex];
             const itemIndex = column.items.findIndex((item) =>
                 item.contains(window),
             );
@@ -899,38 +760,22 @@ class WorkspaceModel {
         return indices;
     }
 
-    /** @returns {Column} */
-    #getFocusedColumn() {
-        return this.#columns[this.#focusedColumn];
+    private getFocusedColumn() {
+        return this.focusedColumn === undefined ?
+                undefined
+            :   this.columns[this.focusedColumn];
     }
 }
 
-/**
- * @param {Column[]} columns
- *
- * @returns {number}
- */
-function calculateTotalWidth(columns) {
+function calculateTotalWidth(columns: Column[]) {
     return columns.reduce((acc, col) => acc + col.rect.width, 0);
 }
 
-/**
- * @param {Item[]} items
- *
- * @returns {number}
- */
-function calculateTotalHeight(items) {
+function calculateTotalHeight(items: Item[]) {
     return items.reduce((acc, item) => acc + item.rect.height, 0);
 }
 
-/**
- * @param {number} index
- * @param {Column[]} columns
- * @param {Column[]} resultCols
- *
- * @returns {Column[]}
- */
-function alignColumns(index, columns, resultCols) {
+function alignColumns(index: number, columns: Column[], resultCols: Column[]) {
     Debug.assert(
         columns[index].equals(resultCols[0]),
         "Provided column is not the column to align to",
@@ -943,7 +788,7 @@ function alignColumns(index, columns, resultCols) {
 
     for (let i = index + 1; i < columns.length; i++) {
         const col = columns[i];
-        const prevCol = resultCols.at(-1);
+        const prevCol = resultCols.at(-1) as Column;
 
         resultCols.push(
             new Column({
@@ -976,14 +821,7 @@ function alignColumns(index, columns, resultCols) {
     return resultCols;
 }
 
-/**
- * @param {number} newFocusIndex
- * @param {Item[]} items
- * @param {Item[]} resultItems
- *
- * @returns {Item[]}
- */
-function alignItems(newFocusIndex, items, resultItems) {
+function alignItems(newFocusIndex: number, items: Item[], resultItems: Item[]) {
     Debug.assert(
         items[newFocusIndex].equals(resultItems[0]),
         "Provided item is not the item to align to",
@@ -996,7 +834,7 @@ function alignItems(newFocusIndex, items, resultItems) {
 
     for (let i = newFocusIndex + 1; i < items.length; i++) {
         const item = items[i];
-        const prevItem = resultItems.at(-1);
+        const prevItem = resultItems.at(-1) as Item;
 
         resultItems.push(
             item.clone({
@@ -1019,19 +857,11 @@ function alignItems(newFocusIndex, items, resultItems) {
     return resultItems;
 }
 
-/**
- * @param {number} newFocusColumn
- * @param {Meta.Window[]} mrus
- * @param {Column[]} columns
- * @param {Rect} workspace
- *
- * @returns {Column[]}
- */
 function calculatePlacementOnMainAxis(
-    newFocusColumn,
-    columns,
-    mrus,
-    workspace,
+    newFocusColumn: number,
+    columns: Column[],
+    mrus: Meta.Window[],
+    workspace: Rect,
 ) {
     const focusBehaviorMainAxis = Settings.getFocusBehaviorMainAxis();
 
@@ -1046,15 +876,12 @@ function calculatePlacementOnMainAxis(
     );
 }
 
-/**
- * @param {number} newFocusItem
- * @param {Item[]} items
- * @param {Meta.Window[]} mrus
- * @param {Rect} workspace
- *
- * @returns {Item[]}
- */
-function calculatePlacementOnCrossAxis(newFocusItem, items, mrus, workspace) {
+function calculatePlacementOnCrossAxis(
+    newFocusItem: number,
+    items: Item[],
+    mrus: Meta.Window[],
+    workspace: Rect,
+) {
     const focusBehaviorCrossAxis = Settings.getFocusBehaviorCrossAxis();
 
     if (focusBehaviorCrossAxis === FocusBehavior.CENTER) {
@@ -1068,14 +895,11 @@ function calculatePlacementOnCrossAxis(newFocusItem, items, mrus, workspace) {
     );
 }
 
-/**
- * @param {number} newFocusIndex
- * @param {Column[]} columns
- * @param {Rect} workspace
- *
- * @returns {Column[]}
- */
-function centerOnMainAxis(newFocusIndex, columns, workspace) {
+function centerOnMainAxis(
+    newFocusIndex: number,
+    columns: Column[],
+    workspace: Rect,
+) {
     const selectedCol = columns[newFocusIndex];
     const resultCols = [
         new Column({
@@ -1095,14 +919,11 @@ function centerOnMainAxis(newFocusIndex, columns, workspace) {
     return alignColumns(newFocusIndex, columns, resultCols);
 }
 
-/**
- * @param {number} newFocusIndex
- * @param {Item[]} items
- * @param {Rect} workspace
- *
- * @returns {Item[]}
- */
-function centerOnCrossAxis(newFocusIndex, items, workspace) {
+function centerOnCrossAxis(
+    newFocusIndex: number,
+    items: Item[],
+    workspace: Rect,
+) {
     const selectedItem = items[newFocusIndex];
     const resultItems = [
         selectedItem.clone({
@@ -1117,20 +938,17 @@ function centerOnCrossAxis(newFocusIndex, items, workspace) {
     return alignItems(newFocusIndex, items, resultItems);
 }
 
-/**
- * @param {number} newFocusColumn
- * @param {Column[]} columns
- * @param {Meta.Window[]} mrus
- * @param {Rect} workspace
- *
- * @returns {Column[]}
- */
-function lazyFollowOnMainAxis(newFocusColumn, columns, mrus, workspace) {
+function lazyFollowOnMainAxis(
+    newFocusColumn: number,
+    columns: Column[],
+    mrus: Meta.Window[],
+    workspace: Rect,
+) {
     const visibleColumns = [columns[newFocusColumn]];
 
     while (true) {
         const leftMostVisibleCol = visibleColumns[0];
-        const rightMostVisibleCol = visibleColumns.at(-1);
+        const rightMostVisibleCol = visibleColumns.at(-1) as Column;
         const leftNeighborIndex = columns.indexOf(leftMostVisibleCol) - 1;
         const rightNeighborIndex = columns.indexOf(rightMostVisibleCol) + 1;
         const maybeLeftNeighborOfVisible = columns[leftNeighborIndex];
@@ -1152,7 +970,7 @@ function lazyFollowOnMainAxis(newFocusColumn, columns, mrus, workspace) {
 
                 if (calculateTotalWidth(visibleColumns) > workspace.width) {
                     return alignToRightMostColForLazyFollowOnMainAxis(
-                        visibleColumns.at(-1),
+                        visibleColumns.at(-1) as Column,
                         columns,
                         workspace,
                     );
@@ -1172,7 +990,7 @@ function lazyFollowOnMainAxis(newFocusColumn, columns, mrus, workspace) {
 
             if (calculateTotalWidth(visibleColumns) > workspace.width) {
                 return alignToRightMostColForLazyFollowOnMainAxis(
-                    visibleColumns.at(-1),
+                    visibleColumns.at(-1) as Column,
                     columns,
                     workspace,
                 );
@@ -1192,13 +1010,7 @@ function lazyFollowOnMainAxis(newFocusColumn, columns, mrus, workspace) {
     }
 }
 
-/**
- * @param {Column[]} columns
- * @param {Rect} workspace
- *
- * @returns {Column[]}
- */
-function centerAllColumnsOnMainAxis(columns, workspace) {
+function centerAllColumnsOnMainAxis(columns: Column[], workspace: Rect) {
     const totalWidth = calculateTotalWidth(columns);
     const [firstCol] = columns;
     const placedFirstCol = new Column({
@@ -1213,13 +1025,10 @@ function centerAllColumnsOnMainAxis(columns, workspace) {
     return alignColumns(0, columns, [placedFirstCol]);
 }
 
-/**
- * @param {Column} leftMostColumn - the left most column in the columns array
- * @param {Column[]} columns
- *
- * @returns {Column[]}
- */
-function alignToLeftMostColForLazyFollowOnMainAxis(leftMostColumn, columns) {
+function alignToLeftMostColForLazyFollowOnMainAxis(
+    leftMostColumn: Column,
+    columns: Column[],
+) {
     const leftMostIndex = columns.indexOf(leftMostColumn);
     const placedCol = new Column({
         focusedItem: leftMostColumn.focusedItem,
@@ -1233,17 +1042,10 @@ function alignToLeftMostColForLazyFollowOnMainAxis(leftMostColumn, columns) {
     return alignColumns(leftMostIndex, columns, [placedCol]);
 }
 
-/**
- * @param {Column} rightMostColumn - the right most column in the columns array
- * @param {Column[]} columns
- * @param {Rect} workspace
- *
- * @returns {Column[]}
- */
 function alignToRightMostColForLazyFollowOnMainAxis(
-    rightMostColumn,
-    columns,
-    workspace,
+    rightMostColumn: Column,
+    columns: Column[],
+    workspace: Rect,
 ) {
     const rightMostIndex = columns.indexOf(rightMostColumn);
     const placedCol = new Column({
@@ -1258,20 +1060,17 @@ function alignToRightMostColForLazyFollowOnMainAxis(
     return alignColumns(rightMostIndex, columns, [placedCol]);
 }
 
-/**
- * @param {number} newFocusItem
- * @param {Item[]} items
- * @param {Meta.Window[]} mrus
- * @param {Rect} workspace
- *
- * @returns {Item[]}
- */
-function lazyFollowOnCrossAxis(newFocusItem, items, mrus, workspace) {
+function lazyFollowOnCrossAxis(
+    newFocusItem: number,
+    items: Item[],
+    mrus: Meta.Window[],
+    workspace: Rect,
+) {
     const visibleItems = [items[newFocusItem]];
 
     while (true) {
         const topMostVisibleItem = visibleItems[0];
-        const bottomMostVisibleItem = visibleItems.at(-1);
+        const bottomMostVisibleItem = visibleItems.at(-1) as Item;
         const aboveIndex = items.indexOf(topMostVisibleItem) - 1;
         const maybeAboveNeighborOfVisible = items[aboveIndex];
         const belowIndex = items.indexOf(bottomMostVisibleItem) + 1;
@@ -1293,7 +1092,7 @@ function lazyFollowOnCrossAxis(newFocusItem, items, mrus, workspace) {
 
                 if (calculateTotalHeight(visibleItems) > workspace.height) {
                     return alignToBottomMostItemForLazyFollowOnCrossAxis(
-                        visibleItems.at(-1),
+                        visibleItems.at(-1) as Item,
                         items,
                         workspace,
                     );
@@ -1313,7 +1112,7 @@ function lazyFollowOnCrossAxis(newFocusItem, items, mrus, workspace) {
 
             if (calculateTotalHeight(visibleItems) > workspace.height) {
                 return alignToBottomMostItemForLazyFollowOnCrossAxis(
-                    visibleItems.at(-1),
+                    visibleItems.at(-1) as Item,
                     items,
                     workspace,
                 );
@@ -1333,30 +1132,20 @@ function lazyFollowOnCrossAxis(newFocusItem, items, mrus, workspace) {
     }
 }
 
-/**
- * @param {Item} topMostItem - the top most item in the items array
- * @param {Item[]} items
- *
- * @returns {Item[]}
- */
-function alignToTopMostItemForLazyFollowOnCrossAxis(topMostItem, items) {
+function alignToTopMostItemForLazyFollowOnCrossAxis(
+    topMostItem: Item,
+    items: Item[],
+) {
     const topMostIndex = items.indexOf(topMostItem);
     const placedItem = topMostItem.clone({ rect: { y: 0 } });
 
     return alignItems(topMostIndex, items, [placedItem]);
 }
 
-/**
- * @param {Item} bottomMostItem - the bottom most item in the items array
- * @param {Item[]} items
- * @param {Rect} workspace
- *
- * @returns {Item[]}
- */
 function alignToBottomMostItemForLazyFollowOnCrossAxis(
-    bottomMostItem,
-    items,
-    workspace,
+    bottomMostItem: Item,
+    items: Item[],
+    workspace: Rect,
 ) {
     const bottomMostIndex = items.indexOf(bottomMostItem);
     const placedItem = bottomMostItem.clone({
@@ -1366,14 +1155,8 @@ function alignToBottomMostItemForLazyFollowOnCrossAxis(
     return alignItems(bottomMostIndex, items, [placedItem]);
 }
 
-/**
- * @param {Item[]} items
- * @param {Rect} workspace
- *
- * @returns {Item[]}
- */
-function centerAllItemsOnCrossAxis(items, workspace) {
-    const totalHeight = totalHeight(items);
+function centerAllItemsOnCrossAxis(items: Item[], workspace: Rect) {
+    const totalHeight = calculateTotalHeight(items);
     const [firstItem] = items;
     const placedFirstItem = firstItem.clone({
         rect: { y: Math.floor(workspace.height / 2 - totalHeight / 2) },
@@ -1382,21 +1165,12 @@ function centerAllItemsOnCrossAxis(items, workspace) {
     return alignItems(0, items, [placedFirstItem]);
 }
 
-/**
- * @param {Meta.Window} window
- * @param {Meta.Window[]} mrus
- * @param {Column[]} columns
- * @param {number} focusedColumn
- * @param {Rect} workspace
- *
- * @returns {Column[]}
- */
 function insertWindowOnLeftOfFocus(
-    window,
-    mrus,
-    columns,
-    focusedColumn,
-    workspace,
+    window: Meta.Window,
+    mrus: Meta.Window[],
+    columns: Column[],
+    focusedColumn: number | undefined,
+    workspace: Rect,
 ) {
     const windowFrame = window.get_frame_rect();
     const [prevFocusedWindow] = mrus;
@@ -1420,6 +1194,10 @@ function insertWindowOnLeftOfFocus(
         ],
     });
 
+    if (focusedColumn === undefined) {
+        return [newColumn];
+    }
+
     return [
         ...columns.slice(0, focusedColumn),
         newColumn,
@@ -1427,21 +1205,12 @@ function insertWindowOnLeftOfFocus(
     ];
 }
 
-/**
- * @param {Meta.Window} window
- * @param {Meta.Window[]} mrus
- * @param {Column[]} columns
- * @param {number} focusedColumn
- * @param {Rect} workspace
- *
- * @returns {Column[]}
- */
 function insertWindowOnRightOfFocus(
-    window,
-    mrus,
-    columns,
-    focusedColumn,
-    workspace,
+    window: Meta.Window,
+    mrus: Meta.Window[],
+    columns: Column[],
+    focusedColumn: number | undefined,
+    workspace: Rect,
 ) {
     const windowFrame = window.get_frame_rect();
     const [prevFocusedWindow] = mrus;
@@ -1465,6 +1234,10 @@ function insertWindowOnRightOfFocus(
         ],
     });
 
+    if (focusedColumn === undefined) {
+        return [newColumn];
+    }
+
     return [
         ...columns.slice(0, focusedColumn + 1),
         newColumn,
@@ -1472,21 +1245,12 @@ function insertWindowOnRightOfFocus(
     ];
 }
 
-/**
- * @param {Meta.Window} window
- * @param {Meta.Window[]} mrus
- * @param {Column[]} columns
- * @param {number} focusedColumn
- * @param {Rect} workspace
- *
- * @returns {Column[]}
- */
 function insertWindowBetweenMrus(
-    window,
-    mrus,
-    columns,
-    focusedColumn,
-    workspace,
+    window: Meta.Window,
+    mrus: Meta.Window[],
+    columns: Column[],
+    focusedColumn: number | undefined,
+    workspace: Rect,
 ) {
     const [prevFocusedWindow, prevPrevFocusedWindow] = mrus;
 
@@ -1507,6 +1271,12 @@ function insertWindowBetweenMrus(
     const prevPrevCol = columns.find((col) =>
         col.contains(prevPrevFocusedWindow),
     );
+
+    Debug.assert(
+        prevCol !== undefined && prevPrevCol !== undefined,
+        "MRUs not found in workspace",
+    );
+
     const direction = prevCol.rect.x - prevPrevCol.rect.x;
 
     if (direction > 0) {
@@ -1530,6 +1300,8 @@ function insertWindowBetweenMrus(
 
 let TestEnv;
 
+// @ts-expect-error globalThis.process only exists in node but not in GNOME. So
+// let's just ignore the `any` type error since it's such a small part.
 if (globalThis.process?.env.NODE_ENV === "test") {
     TestEnv = {
         Column,
@@ -1538,4 +1310,4 @@ if (globalThis.process?.env.NODE_ENV === "test") {
     };
 }
 
-export { TestEnv, WorkspaceModel };
+export { TestEnv, WorkspaceModel, WorkspaceChangeResultErrors };

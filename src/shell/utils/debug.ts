@@ -1,5 +1,6 @@
-/** @type {DebugModule} */
-let MODULE = null;
+import { type Settings } from "./settings.js";
+
+let MODULE: DebugModule = null!;
 
 const DebugLevel = Object.freeze({
     DEBUG: 100,
@@ -9,30 +10,31 @@ const DebugLevel = Object.freeze({
     OFF: 1000,
 });
 
+type DebugLevel = (typeof DebugLevel)[keyof typeof DebugLevel];
+
 /**
- * @param {Settings} settings
+ * @param settings
  */
-function enable(settings) {
+function enable(settings: typeof Settings) {
     MODULE = new DebugModule({ settings });
 }
 
 function disable() {
     MODULE.destroy();
-    MODULE = null;
+    MODULE = null!;
 }
 
 class DebugModule {
-    /** @type {DebugLevel} */
-    #debugLevel;
+    private debugLevel!: DebugLevel;
 
     /**
-     * @param {object} param
-     * @param {Settings} param.settings
+     * @param param
+     * @param param.settings
      */
-    constructor({ settings }) {
+    constructor({ settings }: { settings: typeof Settings }) {
         settings.watch(
             "debug-level",
-            () => (this.#debugLevel = settings.getDebugLevel()),
+            () => (this.debugLevel = settings.getDebugLevel()),
             { tracker: this, immediate: true },
         );
     }
@@ -40,43 +42,41 @@ class DebugModule {
     destroy() {}
 
     /**
-     * @param {boolean} condition
-     * @param {string} [message]
-     * @param {number} [debugLevel]
+     * @param condition
+     * @param message
+     * @param debugLevel
      *
      * @throws {Error} If the condition is not met.
      */
-    assert(condition, message = "", debugLevel = DebugLevel.DEBUG) {
-        if (this.#debugLevel <= debugLevel && !condition) {
+    assert(
+        condition: boolean,
+        message = "",
+        debugLevel = DebugLevel.DEBUG,
+    ): asserts condition {
+        if (this.debugLevel <= debugLevel && !condition) {
             throw new Error(`Assertion failed. ${message}`);
         }
     }
 
-    /**
-     * @returns {DebugModule}
-     */
-    indentLog() {
+    indentLog(): DebugModule {
         console.group();
 
         return this;
     }
 
-    /**
-     * @returns {DebugModule}
-     */
-    dedentLog() {
+    dedentLog(): DebugModule {
         console.groupEnd();
 
         return this;
     }
 
     /**
-     * @param {...any} data
+     * @param data
      *
-     * @returns {DebugModule}
+     * @returns self
      */
-    log(...data) {
-        if (this.#debugLevel <= DebugLevel.DEBUG) {
+    log(...data: unknown[]): DebugModule {
+        if (this.debugLevel <= DebugLevel.DEBUG) {
             console.log(...data);
         }
 
@@ -84,12 +84,12 @@ class DebugModule {
     }
 
     /**
-     * @param {...any} data
+     * @param data
      *
-     * @returns {DebugModule}
+     * @returns self
      */
-    warn(...data) {
-        if (this.#debugLevel <= DebugLevel.WARN) {
+    warn(...data: unknown[]): DebugModule {
+        if (this.debugLevel <= DebugLevel.WARN) {
             console.warn(...data);
         }
 
@@ -97,12 +97,12 @@ class DebugModule {
     }
 
     /**
-     * @param {...any} data
+     * @param data
      *
-     * @returns {DebugModule}
+     * @returns self
      */
-    trace(...data) {
-        if (this.#debugLevel <= DebugLevel.TRACE) {
+    trace(...data: unknown[]): DebugModule {
+        if (this.debugLevel <= DebugLevel.TRACE) {
             console.trace(...data);
         }
 
@@ -110,12 +110,12 @@ class DebugModule {
     }
 
     /**
-     * @param {...any} data
+     * @param data
      *
-     * @returns {DebugModule}
+     * @returns self
      */
-    error(...data) {
-        if (this.#debugLevel <= DebugLevel.ERROR) {
+    error(...data: unknown[]): DebugModule {
+        if (this.debugLevel <= DebugLevel.ERROR) {
             console.error(...data);
         }
 

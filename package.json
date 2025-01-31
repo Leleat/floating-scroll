@@ -7,6 +7,7 @@
     "build": "./scripts/build.sh",
     "build:dev": "./scripts/build.sh --unsafe-reload",
     "build:install": "./scripts/build.sh --install",
+    "format": "prettier --write --no-error-on-unmatched-pattern {src,tests}/**/*.{js,ts}",
     "check:lint": "eslint --no-error-on-unmatched-pattern {src,tests}/**/*.{js,ts}",
     "check:format": "prettier --check --no-error-on-unmatched-pattern {src,tests}/**/*.{js,ts}",
     "check:types": "tsc -noEmit",
@@ -32,7 +33,6 @@
   "license": "GPL-2.0-or-later",
   "devDependencies": {
     "@eslint/js": "^9.18.0",
-    "@girs/gjs": "^4.0.0-beta.19",
     "@girs/gnome-shell": "^47.0.1",
     "@types/eslint__js": "^8.42.3",
     "@vitest/coverage-v8": "^2.1.8",

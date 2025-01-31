@@ -1,25 +1,23 @@
-import { ExtensionPreferences, Gdk, Gtk } from "./dependencies.js";
+import { ExtensionPreferences, Gdk, type Gio, Gtk } from "./dependencies.js";
 
-/**
- * @returns {Gio.Settings}
- */
-export function getSettings() {
+export function getSettings(): Gio.Settings {
     return ExtensionPreferences.lookupByUUID(
         "floating-scroll@extensions.leleat",
-    ).getSettings();
+    )!.getSettings();
 }
 
 /**
  * Copy-pasta from https://gitlab.com/rmnvgr/nightthemeswitcher-gnome-shell-extension/-/blob/main/src/utils.js
- *
- * @param {object} param
- * @param {number} param.keycode
- * @param {number} param.keyval
- * @param {Gdk.ModifierType} param.mask
- *
- * @returns {boolean}
  */
-export function isValidShortcut({ keycode, keyval, mask }) {
+export function isValidShortcut({
+    keycode,
+    keyval,
+    mask,
+}: {
+    keycode: number;
+    keyval: number;
+    mask: Gdk.ModifierType;
+}) {
     if ((mask === 0 || mask === Gdk.ModifierType.SHIFT_MASK) && keycode !== 0) {
         if (
             (keyval >= Gdk.KEY_a && keyval <= Gdk.KEY_z) ||
@@ -63,34 +61,19 @@ export function isValidShortcut({ keycode, keyval, mask }) {
 
 const CLUTTER_MOD4_MASK = 64;
 
-/**
- * @param {number} mask
- *
- * @returns {number}
- */
-export function clutterToGdkMask(mask) {
+export function clutterToGdkMask(mask: number) {
     return (mask & CLUTTER_MOD4_MASK) !== 0 ?
             (mask & ~CLUTTER_MOD4_MASK) | Gdk.ModifierType.SUPER_MASK
         :   mask;
 }
 
-/**
- * @param {number} mask
- *
- * @returns {number}
- */
-export function gdkToClutterMask(mask) {
+export function gdkToClutterMask(mask: Gdk.ModifierType) {
     return (mask & Gdk.ModifierType.SUPER_MASK) !== 0 ?
             (mask & ~Gdk.ModifierType.SUPER_MASK) | CLUTTER_MOD4_MASK
         :   mask;
 }
 
-/**
- * @param {string} shortcut
- *
- * @returns {string}
- */
-export function formatShortcut(shortcut) {
+export function formatShortcut(shortcut: string) {
     const [, keyval, mask] = Gtk.accelerator_parse(shortcut);
 
     return Gtk.accelerator_get_label(keyval, mask);

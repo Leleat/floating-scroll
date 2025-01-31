@@ -1,9 +1,6 @@
 import { GLib } from "../dependencies.js";
 
-/**
- * @type {Timeouts}
- */
-let SINGLETON = null;
+let SINGLETON: Timeouts = null!;
 
 function enable() {
     SINGLETON = new Timeouts();
@@ -11,7 +8,7 @@ function enable() {
 
 function disable() {
     SINGLETON.destroy();
-    SINGLETON = null;
+    SINGLETON = null!;
 }
 
 /**
@@ -21,29 +18,38 @@ function disable() {
  * via `destroy`.
  */
 class Timeouts {
-    /** @type {Map<number, string>} */
-    #sourceIdAndNames = new Map();
+    private sourceIdAndNames: Map<number, string> = new Map();
 
     destroy() {
-        this.#sourceIdAndNames.forEach((_, id) => GLib.Source.remove(id));
-        this.#sourceIdAndNames.clear();
+        this.sourceIdAndNames.forEach((_, id) => GLib.Source.remove(id));
+        this.sourceIdAndNames.clear();
     }
 
     /**
-     * @param {object} param
-     * @param {number} param.interval - the time between calls of `fn` in ms
-     * @param {Function} param.fn - the function to call after `interval`
-     * @param {string} [param.name] - the `name` to give a timeout. A `name` can
+     * @param param
+     * @param param.interval - the time between calls of `fn` in ms
+     * @param param.fn - the function to call after `interval`
+     * @param param.name - the `name` to give a timeout. A `name` can
      *      only be associated with 1 timeout. The previous timeout associated
      *      with `name` will be stopped.
-     * @param {number} [param.priority] - the GLib priority. The default is
+     * @param param.priority - the GLib priority. The default is
      *      `GLib.PRIORITY_DEFAULT`
      *
-     * @returns {number} the id of the event source
+     * @returns the id of the event source
      */
-    add({ interval, fn, priority = GLib.PRIORITY_DEFAULT, name = "" }) {
+    add({
+        interval,
+        fn,
+        priority = GLib.PRIORITY_DEFAULT,
+        name = "",
+    }: {
+        interval: number;
+        fn: () => boolean;
+        name?: string;
+        priority?: number;
+    }): number {
         if (name) {
-            for (const [id, _name] of this.#sourceIdAndNames.entries()) {
+            for (const [id, _name] of this.sourceIdAndNames.entries()) {
                 if (name === _name) {
                     this.remove(id);
                     break;
@@ -56,7 +62,7 @@ class Timeouts {
             const returnVal = fn();
 
             if (returnVal === GLib.SOURCE_REMOVE) {
-                this.#sourceIdAndNames.delete(sourceID);
+                this.sourceIdAndNames.delete(sourceID);
             }
 
             return returnVal;
@@ -64,20 +70,17 @@ class Timeouts {
 
         sourceID = GLib.timeout_add(priority, interval, selfRemovingFn);
 
-        this.#sourceIdAndNames.set(sourceID, name);
+        this.sourceIdAndNames.set(sourceID, name);
 
         return sourceID;
     }
 
-    /**
-     * @param {number} id
-     */
-    remove(id) {
-        if (!this.#sourceIdAndNames.has(id)) {
+    remove(id: number) {
+        if (!this.sourceIdAndNames.has(id)) {
             return;
         }
 
-        this.#sourceIdAndNames.delete(id);
+        this.sourceIdAndNames.delete(id);
         GLib.Source.remove(id);
     }
 }
