@@ -20,6 +20,8 @@ jobs:
         run: npm run check:format
       - name: Lint code
         run: npm run check:lint
+      - name: Run TypeScript check
+        run: npm run check:types
   tests:
     runs-on: ubuntu-latest
     steps:
