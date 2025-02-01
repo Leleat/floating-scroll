@@ -15,8 +15,8 @@ type DebugLevel = (typeof DebugLevel)[keyof typeof DebugLevel];
 /**
  * @param settings
  */
-function enable(settings: typeof Settings) {
-    MODULE = new DebugModule({ settings });
+function enable(settings: typeof Settings, prefix?: string) {
+    MODULE = new DebugModule({ settings, prefix });
 }
 
 function disable() {
@@ -26,17 +26,22 @@ function disable() {
 
 class DebugModule {
     private debugLevel!: DebugLevel;
+    private prefix: string;
 
-    /**
-     * @param param
-     * @param param.settings
-     */
-    constructor({ settings }: { settings: typeof Settings }) {
+    constructor({
+        settings,
+        prefix = "",
+    }: {
+        settings: typeof Settings;
+        prefix?: string;
+    }) {
         settings.watch(
             "debug-level",
             () => (this.debugLevel = settings.getDebugLevel()),
             { tracker: this, immediate: true },
         );
+
+        this.prefix = prefix;
     }
 
     destroy() {}
@@ -54,7 +59,9 @@ class DebugModule {
         debugLevel = DebugLevel.DEBUG,
     ): asserts condition {
         if (this.debugLevel <= debugLevel && !condition) {
-            throw new Error(`Assertion failed. ${message}`);
+            throw new Error(
+                `${this.prefix ? this.prefix + " " : ""}Assertion failed. ${message}`,
+            );
         }
     }
 
@@ -77,7 +84,7 @@ class DebugModule {
      */
     log(...data: unknown[]): DebugModule {
         if (this.debugLevel <= DebugLevel.DEBUG) {
-            console.log(...data);
+            console.log(this.prefix, ...data);
         }
 
         return this;
@@ -90,7 +97,7 @@ class DebugModule {
      */
     warn(...data: unknown[]): DebugModule {
         if (this.debugLevel <= DebugLevel.WARN) {
-            console.warn(...data);
+            console.warn(this.prefix, ...data);
         }
 
         return this;
@@ -103,7 +110,7 @@ class DebugModule {
      */
     trace(...data: unknown[]): DebugModule {
         if (this.debugLevel <= DebugLevel.TRACE) {
-            console.trace(...data);
+            console.trace(this.prefix, ...data);
         }
 
         return this;
@@ -116,7 +123,7 @@ class DebugModule {
      */
     error(...data: unknown[]): DebugModule {
         if (this.debugLevel <= DebugLevel.ERROR) {
-            console.error(...data);
+            console.error(this.prefix, ...data);
         }
 
         return this;
