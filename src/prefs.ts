@@ -20,12 +20,12 @@ export default class Prefs extends ExtensionPreferences {
 
         const builder = new Gtk.Builder();
 
-        builder.add_from_resource("/ui/pages/windowPlacement.ui");
-        builder.add_from_resource("/ui/pages/windowFocus.ui");
+        builder.add_from_resource("/ui/pages/placement.ui");
+        builder.add_from_resource("/ui/pages/focus.ui");
         builder.add_from_resource("/ui/pages/shortcuts.ui");
 
-        window.add(builder.get_object("window-placement"));
-        window.add(builder.get_object("window-focus"));
+        window.add(builder.get_object("placement"));
+        window.add(builder.get_object("focus"));
         window.add(builder.get_object("shortcuts"));
 
         const settings = this.getSettings();

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <interface domain="floating-scroll@extensions.leleat">
-  <object class="AdwPreferencesPage" id="window-focus">
-    <property name="title" translatable="yes">Window Focus</property>
+  <object class="AdwPreferencesPage" id="focus">
+    <property name="title" translatable="yes">Focus</property>
     <property name="icon-name">view-app-grid-symbolic</property>
     <child>
       <object class="AdwPreferencesGroup">

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <interface domain="floating-scroll@extensions.leleat">
-  <object class="AdwPreferencesPage" id="window-placement">
-    <property name="title" translatable="yes">Window Placement</property>
+  <object class="AdwPreferencesPage" id="placement">
+    <property name="title" translatable="yes">Placement</property>
     <property name="icon-name">view-app-grid-symbolic</property>
     <child>
       <object class="AdwPreferencesGroup">
