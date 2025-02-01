@@ -6,5 +6,5 @@
   "uuid": "floating-scroll@extensions.leleat",
   "gettext-domain": "floating-scroll@extensions.leleat",
   "settings-schema": "org.gnome.shell.extensions.floating-scroll",
-  "shell-version": ["47"]
+  "shell-version": ["48"]
 }
