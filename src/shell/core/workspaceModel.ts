@@ -284,14 +284,14 @@ class WorkspaceModel {
         );
 
         const mrus = this.workspaceModelManager.getWindows();
-        const placedCols = calculatePlacementOnMainAxis(
+        const placedCols = this.calculatePlacementOnMainAxis(
             newFocusedColumn,
             this.columns,
             mrus,
             this.workArea,
         );
         const placedFocusedCol = placedCols[newFocusedColumn];
-        const placedItems = calculatePlacementOnCrossAxis(
+        const placedItems = this.calculatePlacementOnCrossAxis(
             newFocusItem,
             placedFocusedCol.items,
             mrus,
@@ -553,7 +553,7 @@ class WorkspaceModel {
                     toColumn,
                     new Column({
                         focusedItem: focusedItemInNewFromColumn,
-                        items: calculatePlacementOnCrossAxis(
+                        items: this.calculatePlacementOnCrossAxis(
                             focusedItemInNewFromColumn,
                             fromColumn.items.toSpliced(
                                 fromColumn.focusedItem,
@@ -616,7 +616,7 @@ class WorkspaceModel {
                     ...this.columns.slice(0, this.focusedColumn),
                     new Column({
                         focusedItem: focusedItemInNewFromColumn,
-                        items: calculatePlacementOnCrossAxis(
+                        items: this.calculatePlacementOnCrossAxis(
                             focusedItemInNewFromColumn,
                             fromColumn.items.toSpliced(
                                 fromColumn.focusedItem,
@@ -655,7 +655,7 @@ class WorkspaceModel {
             .filter((w) => w !== window);
 
         if (openingPosition === WindowOpeningPosition.LEFT) {
-            cols = insertWindowOnLeftOfFocus(
+            cols = this.insertWindowOnLeftOfFocus(
                 window,
                 mrus,
                 this.columns,
@@ -663,7 +663,7 @@ class WorkspaceModel {
                 this.workArea,
             );
         } else if (openingPosition === WindowOpeningPosition.RIGHT) {
-            cols = insertWindowOnRightOfFocus(
+            cols = this.insertWindowOnRightOfFocus(
                 window,
                 mrus,
                 this.columns,
@@ -671,7 +671,7 @@ class WorkspaceModel {
                 this.workArea,
             );
         } else if (openingPosition === WindowOpeningPosition.BETWEEN_MRU) {
-            cols = insertWindowBetweenMrus(
+            cols = this.insertWindowBetweenMrus(
                 window,
                 mrus,
                 this.columns,
@@ -723,7 +723,7 @@ class WorkspaceModel {
         const focusedItem = Math.min(column.focusedItem, items.length - 1);
         const newColumn = new Column({
             focusedItem: focusedItem,
-            items: calculatePlacementOnCrossAxis(
+            items: this.calculatePlacementOnCrossAxis(
                 focusedItem,
                 items,
                 this.workspaceModelManager.getWindows(),
@@ -765,536 +765,580 @@ class WorkspaceModel {
                 undefined
             :   this.columns[this.focusedColumn];
     }
-}
 
-function calculateTotalWidth(columns: Column[]) {
-    return columns.reduce((acc, col) => acc + col.rect.width, 0);
-}
+    private calculateTotalWidth(columns: Column[]) {
+        return columns.reduce((acc, col) => acc + col.rect.width, 0);
+    }
 
-function calculateTotalHeight(items: Item[]) {
-    return items.reduce((acc, item) => acc + item.rect.height, 0);
-}
+    private calculateTotalHeight(items: Item[]) {
+        return items.reduce((acc, item) => acc + item.rect.height, 0);
+    }
 
-function alignColumns(index: number, columns: Column[], resultCols: Column[]) {
-    Debug.assert(
-        columns[index].equals(resultCols[0]),
-        "Provided column is not the column to align to",
-    );
+    private alignColumns(
+        index: number,
+        columns: Column[],
+        resultCols: Column[],
+    ) {
+        Debug.assert(
+            columns[index].equals(resultCols[0]),
+            "Provided column is not the column to align to",
+        );
 
-    Debug.assert(
-        resultCols.length === 1,
-        "No column that other columns should be aligned to was provided",
-    );
+        Debug.assert(
+            resultCols.length === 1,
+            "No column that other columns should be aligned to was provided",
+        );
 
-    for (let i = index + 1; i < columns.length; i++) {
-        const col = columns[i];
-        const prevCol = resultCols.at(-1) as Column;
+        for (let i = index + 1; i < columns.length; i++) {
+            const col = columns[i];
+            const prevCol = resultCols.at(-1) as Column;
 
-        resultCols.push(
+            resultCols.push(
+                new Column({
+                    focusedItem: col.focusedItem,
+                    items: col.items.map((item) => {
+                        return item.clone({
+                            rect: { x: prevCol.rect.x + prevCol.rect.width },
+                        });
+                    }),
+                }),
+            );
+        }
+
+        for (let i = index - 1; i >= 0; i--) {
+            const col = columns[i];
+            const nextCol = resultCols[0];
+
+            resultCols.unshift(
+                new Column({
+                    focusedItem: col.focusedItem,
+                    items: col.items.map((item) => {
+                        return item.clone({
+                            rect: { x: nextCol.rect.x - item.rect.width },
+                        });
+                    }),
+                }),
+            );
+        }
+
+        return resultCols;
+    }
+
+    private alignItems(
+        newFocusIndex: number,
+        items: Item[],
+        resultItems: Item[],
+    ) {
+        Debug.assert(
+            items[newFocusIndex].equals(resultItems[0]),
+            "Provided item is not the item to align to",
+        );
+
+        Debug.assert(
+            resultItems.length === 1,
+            "No item that other items should be aligned to was provided",
+        );
+
+        for (let i = newFocusIndex + 1; i < items.length; i++) {
+            const item = items[i];
+            const prevItem = resultItems.at(-1) as Item;
+
+            resultItems.push(
+                item.clone({
+                    rect: { y: prevItem.rect.y + prevItem.rect.height },
+                }),
+            );
+        }
+
+        for (let i = newFocusIndex - 1; i >= 0; i--) {
+            const item = items[i];
+            const nextItem = resultItems[0];
+
+            resultItems.unshift(
+                item.clone({
+                    rect: { y: nextItem.rect.y - item.rect.height },
+                }),
+            );
+        }
+
+        return resultItems;
+    }
+
+    private calculatePlacementOnMainAxis(
+        newFocusColumn: number,
+        columns: Column[],
+        mrus: Meta.Window[],
+        workspace: Rect,
+    ) {
+        const focusBehaviorMainAxis = Settings.getFocusBehaviorMainAxis();
+
+        if (focusBehaviorMainAxis === FocusBehavior.CENTER) {
+            return this.centerOnMainAxis(newFocusColumn, columns, workspace);
+        } else if (focusBehaviorMainAxis === FocusBehavior.LAZY_FOLLOW) {
+            return this.lazyFollowOnMainAxis(
+                newFocusColumn,
+                columns,
+                mrus,
+                workspace,
+            );
+        }
+
+        throw new Error(
+            `Unknown focus behavior for main axis: ${focusBehaviorMainAxis}`,
+        );
+    }
+
+    private calculatePlacementOnCrossAxis(
+        newFocusItem: number,
+        items: Item[],
+        mrus: Meta.Window[],
+        workspace: Rect,
+    ) {
+        const focusBehaviorCrossAxis = Settings.getFocusBehaviorCrossAxis();
+
+        if (focusBehaviorCrossAxis === FocusBehavior.CENTER) {
+            return this.centerOnCrossAxis(newFocusItem, items, workspace);
+        } else if (focusBehaviorCrossAxis === FocusBehavior.LAZY_FOLLOW) {
+            return this.lazyFollowOnCrossAxis(
+                newFocusItem,
+                items,
+                mrus,
+                workspace,
+            );
+        }
+
+        throw new Error(
+            `Unknown focus behavior for cross axis: ${focusBehaviorCrossAxis}`,
+        );
+    }
+
+    private centerOnMainAxis(
+        newFocusIndex: number,
+        columns: Column[],
+        workspace: Rect,
+    ) {
+        const selectedCol = columns[newFocusIndex];
+        const resultCols = [
             new Column({
-                focusedItem: col.focusedItem,
-                items: col.items.map((item) => {
+                focusedItem: selectedCol.focusedItem,
+                items: selectedCol.items.map((item) => {
                     return item.clone({
-                        rect: { x: prevCol.rect.x + prevCol.rect.width },
+                        rect: {
+                            x: Math.floor(
+                                workspace.width / 2 - item.rect.width / 2,
+                            ),
+                        },
                     });
                 }),
             }),
-        );
+        ];
+
+        return this.alignColumns(newFocusIndex, columns, resultCols);
     }
 
-    for (let i = index - 1; i >= 0; i--) {
-        const col = columns[i];
-        const nextCol = resultCols[0];
-
-        resultCols.unshift(
-            new Column({
-                focusedItem: col.focusedItem,
-                items: col.items.map((item) => {
-                    return item.clone({
-                        rect: { x: nextCol.rect.x - item.rect.width },
-                    });
-                }),
+    private centerOnCrossAxis(
+        newFocusIndex: number,
+        items: Item[],
+        workspace: Rect,
+    ) {
+        const selectedItem = items[newFocusIndex];
+        const resultItems = [
+            selectedItem.clone({
+                rect: {
+                    y: Math.floor(
+                        workspace.height / 2 - selectedItem.rect.height / 2,
+                    ),
+                },
             }),
-        );
+        ];
+
+        return this.alignItems(newFocusIndex, items, resultItems);
     }
 
-    return resultCols;
-}
+    private lazyFollowOnMainAxis(
+        newFocusColumn: number,
+        columns: Column[],
+        mrus: Meta.Window[],
+        workspace: Rect,
+    ) {
+        const visibleColumns = [columns[newFocusColumn]];
 
-function alignItems(newFocusIndex: number, items: Item[], resultItems: Item[]) {
-    Debug.assert(
-        items[newFocusIndex].equals(resultItems[0]),
-        "Provided item is not the item to align to",
-    );
+        while (true) {
+            const leftMostVisibleCol = visibleColumns[0];
+            const rightMostVisibleCol = visibleColumns.at(-1) as Column;
+            const leftNeighborIndex = columns.indexOf(leftMostVisibleCol) - 1;
+            const rightNeighborIndex = columns.indexOf(rightMostVisibleCol) + 1;
+            const maybeLeftNeighborOfVisible = columns[leftNeighborIndex];
+            const maybeRightNeighborOfVisible = columns[rightNeighborIndex];
 
-    Debug.assert(
-        resultItems.length === 1,
-        "No item that other items should be aligned to was provided",
-    );
+            if (
+                maybeLeftNeighborOfVisible !== undefined &&
+                maybeRightNeighborOfVisible !== undefined
+            ) {
+                const mruPositionOfLeftNeighbor = mrus.indexOf(
+                    maybeLeftNeighborOfVisible
+                        .getFocusedItem()
+                        .getFocusedWindow(),
+                );
+                const mruPositionOfRightNeighbor = mrus.indexOf(
+                    maybeRightNeighborOfVisible
+                        .getFocusedItem()
+                        .getFocusedWindow(),
+                );
 
-    for (let i = newFocusIndex + 1; i < items.length; i++) {
-        const item = items[i];
-        const prevItem = resultItems.at(-1) as Item;
+                if (mruPositionOfLeftNeighbor < mruPositionOfRightNeighbor) {
+                    visibleColumns.unshift(maybeLeftNeighborOfVisible);
 
-        resultItems.push(
-            item.clone({
-                rect: { y: prevItem.rect.y + prevItem.rect.height },
-            }),
-        );
-    }
+                    if (
+                        this.calculateTotalWidth(visibleColumns) >
+                        workspace.width
+                    ) {
+                        return this.alignToRightMostColForLazyFollowOnMainAxis(
+                            visibleColumns.at(-1) as Column,
+                            columns,
+                            workspace,
+                        );
+                    }
+                } else {
+                    visibleColumns.push(maybeRightNeighborOfVisible);
 
-    for (let i = newFocusIndex - 1; i >= 0; i--) {
-        const item = items[i];
-        const nextItem = resultItems[0];
-
-        resultItems.unshift(
-            item.clone({
-                rect: { y: nextItem.rect.y - item.rect.height },
-            }),
-        );
-    }
-
-    return resultItems;
-}
-
-function calculatePlacementOnMainAxis(
-    newFocusColumn: number,
-    columns: Column[],
-    mrus: Meta.Window[],
-    workspace: Rect,
-) {
-    const focusBehaviorMainAxis = Settings.getFocusBehaviorMainAxis();
-
-    if (focusBehaviorMainAxis === FocusBehavior.CENTER) {
-        return centerOnMainAxis(newFocusColumn, columns, workspace);
-    } else if (focusBehaviorMainAxis === FocusBehavior.LAZY_FOLLOW) {
-        return lazyFollowOnMainAxis(newFocusColumn, columns, mrus, workspace);
-    }
-
-    throw new Error(
-        `Unknown focus behavior for main axis: ${focusBehaviorMainAxis}`,
-    );
-}
-
-function calculatePlacementOnCrossAxis(
-    newFocusItem: number,
-    items: Item[],
-    mrus: Meta.Window[],
-    workspace: Rect,
-) {
-    const focusBehaviorCrossAxis = Settings.getFocusBehaviorCrossAxis();
-
-    if (focusBehaviorCrossAxis === FocusBehavior.CENTER) {
-        return centerOnCrossAxis(newFocusItem, items, workspace);
-    } else if (focusBehaviorCrossAxis === FocusBehavior.LAZY_FOLLOW) {
-        return lazyFollowOnCrossAxis(newFocusItem, items, mrus, workspace);
-    }
-
-    throw new Error(
-        `Unknown focus behavior for cross axis: ${focusBehaviorCrossAxis}`,
-    );
-}
-
-function centerOnMainAxis(
-    newFocusIndex: number,
-    columns: Column[],
-    workspace: Rect,
-) {
-    const selectedCol = columns[newFocusIndex];
-    const resultCols = [
-        new Column({
-            focusedItem: selectedCol.focusedItem,
-            items: selectedCol.items.map((item) => {
-                return item.clone({
-                    rect: {
-                        x: Math.floor(
-                            workspace.width / 2 - item.rect.width / 2,
-                        ),
-                    },
-                });
-            }),
-        }),
-    ];
-
-    return alignColumns(newFocusIndex, columns, resultCols);
-}
-
-function centerOnCrossAxis(
-    newFocusIndex: number,
-    items: Item[],
-    workspace: Rect,
-) {
-    const selectedItem = items[newFocusIndex];
-    const resultItems = [
-        selectedItem.clone({
-            rect: {
-                y: Math.floor(
-                    workspace.height / 2 - selectedItem.rect.height / 2,
-                ),
-            },
-        }),
-    ];
-
-    return alignItems(newFocusIndex, items, resultItems);
-}
-
-function lazyFollowOnMainAxis(
-    newFocusColumn: number,
-    columns: Column[],
-    mrus: Meta.Window[],
-    workspace: Rect,
-) {
-    const visibleColumns = [columns[newFocusColumn]];
-
-    while (true) {
-        const leftMostVisibleCol = visibleColumns[0];
-        const rightMostVisibleCol = visibleColumns.at(-1) as Column;
-        const leftNeighborIndex = columns.indexOf(leftMostVisibleCol) - 1;
-        const rightNeighborIndex = columns.indexOf(rightMostVisibleCol) + 1;
-        const maybeLeftNeighborOfVisible = columns[leftNeighborIndex];
-        const maybeRightNeighborOfVisible = columns[rightNeighborIndex];
-
-        if (
-            maybeLeftNeighborOfVisible !== undefined &&
-            maybeRightNeighborOfVisible !== undefined
-        ) {
-            const mruPositionOfLeftNeighbor = mrus.indexOf(
-                maybeLeftNeighborOfVisible.getFocusedItem().getFocusedWindow(),
-            );
-            const mruPositionOfRightNeighbor = mrus.indexOf(
-                maybeRightNeighborOfVisible.getFocusedItem().getFocusedWindow(),
-            );
-
-            if (mruPositionOfLeftNeighbor < mruPositionOfRightNeighbor) {
+                    if (
+                        this.calculateTotalWidth(visibleColumns) >
+                        workspace.width
+                    ) {
+                        return this.alignToLeftMostColForLazyFollowOnMainAxis(
+                            visibleColumns[0],
+                            columns,
+                        );
+                    }
+                }
+            } else if (maybeLeftNeighborOfVisible !== undefined) {
                 visibleColumns.unshift(maybeLeftNeighborOfVisible);
 
-                if (calculateTotalWidth(visibleColumns) > workspace.width) {
-                    return alignToRightMostColForLazyFollowOnMainAxis(
+                if (
+                    this.calculateTotalWidth(visibleColumns) > workspace.width
+                ) {
+                    return this.alignToRightMostColForLazyFollowOnMainAxis(
                         visibleColumns.at(-1) as Column,
                         columns,
                         workspace,
                     );
                 }
-            } else {
+            } else if (maybeRightNeighborOfVisible !== undefined) {
                 visibleColumns.push(maybeRightNeighborOfVisible);
 
-                if (calculateTotalWidth(visibleColumns) > workspace.width) {
-                    return alignToLeftMostColForLazyFollowOnMainAxis(
+                if (
+                    this.calculateTotalWidth(visibleColumns) > workspace.width
+                ) {
+                    return this.alignToLeftMostColForLazyFollowOnMainAxis(
                         visibleColumns[0],
                         columns,
                     );
                 }
+            } else {
+                return this.centerAllColumnsOnMainAxis(columns, workspace);
             }
-        } else if (maybeLeftNeighborOfVisible !== undefined) {
-            visibleColumns.unshift(maybeLeftNeighborOfVisible);
-
-            if (calculateTotalWidth(visibleColumns) > workspace.width) {
-                return alignToRightMostColForLazyFollowOnMainAxis(
-                    visibleColumns.at(-1) as Column,
-                    columns,
-                    workspace,
-                );
-            }
-        } else if (maybeRightNeighborOfVisible !== undefined) {
-            visibleColumns.push(maybeRightNeighborOfVisible);
-
-            if (calculateTotalWidth(visibleColumns) > workspace.width) {
-                return alignToLeftMostColForLazyFollowOnMainAxis(
-                    visibleColumns[0],
-                    columns,
-                );
-            }
-        } else {
-            return centerAllColumnsOnMainAxis(columns, workspace);
         }
     }
-}
 
-function centerAllColumnsOnMainAxis(columns: Column[], workspace: Rect) {
-    const totalWidth = calculateTotalWidth(columns);
-    const [firstCol] = columns;
-    const placedFirstCol = new Column({
-        focusedItem: firstCol.focusedItem,
-        items: firstCol.items.map((item) => {
-            return item.clone({
-                rect: { x: Math.floor(workspace.width / 2 - totalWidth / 2) },
-            });
-        }),
-    });
+    private centerAllColumnsOnMainAxis(columns: Column[], workspace: Rect) {
+        const totalWidth = this.calculateTotalWidth(columns);
+        const [firstCol] = columns;
+        const placedFirstCol = new Column({
+            focusedItem: firstCol.focusedItem,
+            items: firstCol.items.map((item) => {
+                return item.clone({
+                    rect: {
+                        x: Math.floor(workspace.width / 2 - totalWidth / 2),
+                    },
+                });
+            }),
+        });
 
-    return alignColumns(0, columns, [placedFirstCol]);
-}
+        return this.alignColumns(0, columns, [placedFirstCol]);
+    }
 
-function alignToLeftMostColForLazyFollowOnMainAxis(
-    leftMostColumn: Column,
-    columns: Column[],
-) {
-    const leftMostIndex = columns.indexOf(leftMostColumn);
-    const placedCol = new Column({
-        focusedItem: leftMostColumn.focusedItem,
-        items: leftMostColumn.items.map((item) => {
-            return item.clone({
-                rect: { x: leftMostColumn.rect.width - item.rect.width },
-            });
-        }),
-    });
+    private alignToLeftMostColForLazyFollowOnMainAxis(
+        leftMostColumn: Column,
+        columns: Column[],
+    ) {
+        const leftMostIndex = columns.indexOf(leftMostColumn);
+        const placedCol = new Column({
+            focusedItem: leftMostColumn.focusedItem,
+            items: leftMostColumn.items.map((item) => {
+                return item.clone({
+                    rect: { x: leftMostColumn.rect.width - item.rect.width },
+                });
+            }),
+        });
 
-    return alignColumns(leftMostIndex, columns, [placedCol]);
-}
+        return this.alignColumns(leftMostIndex, columns, [placedCol]);
+    }
 
-function alignToRightMostColForLazyFollowOnMainAxis(
-    rightMostColumn: Column,
-    columns: Column[],
-    workspace: Rect,
-) {
-    const rightMostIndex = columns.indexOf(rightMostColumn);
-    const placedCol = new Column({
-        focusedItem: rightMostColumn.focusedItem,
-        items: rightMostColumn.items.map((item) => {
-            return item.clone({
-                rect: { x: workspace.width - rightMostColumn.rect.width },
-            });
-        }),
-    });
+    private alignToRightMostColForLazyFollowOnMainAxis(
+        rightMostColumn: Column,
+        columns: Column[],
+        workspace: Rect,
+    ) {
+        const rightMostIndex = columns.indexOf(rightMostColumn);
+        const placedCol = new Column({
+            focusedItem: rightMostColumn.focusedItem,
+            items: rightMostColumn.items.map((item) => {
+                return item.clone({
+                    rect: { x: workspace.width - rightMostColumn.rect.width },
+                });
+            }),
+        });
 
-    return alignColumns(rightMostIndex, columns, [placedCol]);
-}
+        return this.alignColumns(rightMostIndex, columns, [placedCol]);
+    }
 
-function lazyFollowOnCrossAxis(
-    newFocusItem: number,
-    items: Item[],
-    mrus: Meta.Window[],
-    workspace: Rect,
-) {
-    const visibleItems = [items[newFocusItem]];
+    private lazyFollowOnCrossAxis(
+        newFocusItem: number,
+        items: Item[],
+        mrus: Meta.Window[],
+        workspace: Rect,
+    ) {
+        const visibleItems = [items[newFocusItem]];
 
-    while (true) {
-        const topMostVisibleItem = visibleItems[0];
-        const bottomMostVisibleItem = visibleItems.at(-1) as Item;
-        const aboveIndex = items.indexOf(topMostVisibleItem) - 1;
-        const maybeAboveNeighborOfVisible = items[aboveIndex];
-        const belowIndex = items.indexOf(bottomMostVisibleItem) + 1;
-        const maybeBottomNeighborOfVisible = items[belowIndex];
+        while (true) {
+            const topMostVisibleItem = visibleItems[0];
+            const bottomMostVisibleItem = visibleItems.at(-1) as Item;
+            const aboveIndex = items.indexOf(topMostVisibleItem) - 1;
+            const maybeAboveNeighborOfVisible = items[aboveIndex];
+            const belowIndex = items.indexOf(bottomMostVisibleItem) + 1;
+            const maybeBottomNeighborOfVisible = items[belowIndex];
 
-        if (
-            maybeAboveNeighborOfVisible !== undefined &&
-            maybeBottomNeighborOfVisible !== undefined
-        ) {
-            const mruPositionOfLeftNeighbor = mrus.indexOf(
-                maybeAboveNeighborOfVisible.getFocusedWindow(),
-            );
-            const mruPositionOfRightNeighbor = mrus.indexOf(
-                maybeBottomNeighborOfVisible.getFocusedWindow(),
-            );
+            if (
+                maybeAboveNeighborOfVisible !== undefined &&
+                maybeBottomNeighborOfVisible !== undefined
+            ) {
+                const mruPositionOfLeftNeighbor = mrus.indexOf(
+                    maybeAboveNeighborOfVisible.getFocusedWindow(),
+                );
+                const mruPositionOfRightNeighbor = mrus.indexOf(
+                    maybeBottomNeighborOfVisible.getFocusedWindow(),
+                );
 
-            if (mruPositionOfLeftNeighbor < mruPositionOfRightNeighbor) {
+                if (mruPositionOfLeftNeighbor < mruPositionOfRightNeighbor) {
+                    visibleItems.unshift(maybeAboveNeighborOfVisible);
+
+                    if (
+                        this.calculateTotalHeight(visibleItems) >
+                        workspace.height
+                    ) {
+                        return this.alignToBottomMostItemForLazyFollowOnCrossAxis(
+                            visibleItems.at(-1) as Item,
+                            items,
+                            workspace,
+                        );
+                    }
+                } else {
+                    visibleItems.push(maybeBottomNeighborOfVisible);
+
+                    if (
+                        this.calculateTotalHeight(visibleItems) >
+                        workspace.height
+                    ) {
+                        return this.alignToTopMostItemForLazyFollowOnCrossAxis(
+                            visibleItems[0],
+                            items,
+                        );
+                    }
+                }
+            } else if (maybeAboveNeighborOfVisible !== undefined) {
                 visibleItems.unshift(maybeAboveNeighborOfVisible);
 
-                if (calculateTotalHeight(visibleItems) > workspace.height) {
-                    return alignToBottomMostItemForLazyFollowOnCrossAxis(
+                if (
+                    this.calculateTotalHeight(visibleItems) > workspace.height
+                ) {
+                    return this.alignToBottomMostItemForLazyFollowOnCrossAxis(
                         visibleItems.at(-1) as Item,
                         items,
                         workspace,
                     );
                 }
-            } else {
+            } else if (maybeBottomNeighborOfVisible !== undefined) {
                 visibleItems.push(maybeBottomNeighborOfVisible);
 
-                if (calculateTotalHeight(visibleItems) > workspace.height) {
-                    return alignToTopMostItemForLazyFollowOnCrossAxis(
+                if (
+                    this.calculateTotalHeight(visibleItems) > workspace.height
+                ) {
+                    return this.alignToTopMostItemForLazyFollowOnCrossAxis(
                         visibleItems[0],
                         items,
                     );
                 }
+            } else {
+                return this.centerAllItemsOnCrossAxis(items, workspace);
             }
-        } else if (maybeAboveNeighborOfVisible !== undefined) {
-            visibleItems.unshift(maybeAboveNeighborOfVisible);
-
-            if (calculateTotalHeight(visibleItems) > workspace.height) {
-                return alignToBottomMostItemForLazyFollowOnCrossAxis(
-                    visibleItems.at(-1) as Item,
-                    items,
-                    workspace,
-                );
-            }
-        } else if (maybeBottomNeighborOfVisible !== undefined) {
-            visibleItems.push(maybeBottomNeighborOfVisible);
-
-            if (calculateTotalHeight(visibleItems) > workspace.height) {
-                return alignToTopMostItemForLazyFollowOnCrossAxis(
-                    visibleItems[0],
-                    items,
-                );
-            }
-        } else {
-            return centerAllItemsOnCrossAxis(items, workspace);
         }
     }
-}
 
-function alignToTopMostItemForLazyFollowOnCrossAxis(
-    topMostItem: Item,
-    items: Item[],
-) {
-    const topMostIndex = items.indexOf(topMostItem);
-    const placedItem = topMostItem.clone({ rect: { y: 0 } });
-
-    return alignItems(topMostIndex, items, [placedItem]);
-}
-
-function alignToBottomMostItemForLazyFollowOnCrossAxis(
-    bottomMostItem: Item,
-    items: Item[],
-    workspace: Rect,
-) {
-    const bottomMostIndex = items.indexOf(bottomMostItem);
-    const placedItem = bottomMostItem.clone({
-        rect: { y: workspace.height - bottomMostItem.rect.height },
-    });
-
-    return alignItems(bottomMostIndex, items, [placedItem]);
-}
-
-function centerAllItemsOnCrossAxis(items: Item[], workspace: Rect) {
-    const totalHeight = calculateTotalHeight(items);
-    const [firstItem] = items;
-    const placedFirstItem = firstItem.clone({
-        rect: { y: Math.floor(workspace.height / 2 - totalHeight / 2) },
-    });
-
-    return alignItems(0, items, [placedFirstItem]);
-}
-
-function insertWindowOnLeftOfFocus(
-    window: Meta.Window,
-    mrus: Meta.Window[],
-    columns: Column[],
-    focusedColumn: number | undefined,
-    workspace: Rect,
-) {
-    const windowFrame = window.get_frame_rect();
-    const [prevFocusedWindow] = mrus;
-    const prevCol =
-        prevFocusedWindow &&
-        columns.find((col) => col.contains(prevFocusedWindow));
-    const newColumn = new Column({
-        focusedItem: 0,
-        items: [
-            new Item({
-                value: window,
-                rect: {
-                    x: prevCol ? prevCol.rect.x - windowFrame.width : 0,
-                    y: Math.floor(
-                        workspace.height / 2 - windowFrame.height / 2,
-                    ),
-                    width: windowFrame.width,
-                    height: windowFrame.height,
-                },
-            }),
-        ],
-    });
-
-    if (focusedColumn === undefined) {
-        return [newColumn];
-    }
-
-    return [
-        ...columns.slice(0, focusedColumn),
-        newColumn,
-        ...columns.slice(focusedColumn),
-    ];
-}
-
-function insertWindowOnRightOfFocus(
-    window: Meta.Window,
-    mrus: Meta.Window[],
-    columns: Column[],
-    focusedColumn: number | undefined,
-    workspace: Rect,
-) {
-    const windowFrame = window.get_frame_rect();
-    const [prevFocusedWindow] = mrus;
-    const prevCol =
-        prevFocusedWindow &&
-        columns.find((col) => col.contains(prevFocusedWindow));
-    const newColumn = new Column({
-        focusedItem: 0,
-        items: [
-            new Item({
-                value: window,
-                rect: {
-                    x: prevCol ? prevCol.rect.x + windowFrame.width : 0,
-                    y: Math.floor(
-                        workspace.height / 2 - windowFrame.height / 2,
-                    ),
-                    width: windowFrame.width,
-                    height: windowFrame.height,
-                },
-            }),
-        ],
-    });
-
-    if (focusedColumn === undefined) {
-        return [newColumn];
-    }
-
-    return [
-        ...columns.slice(0, focusedColumn + 1),
-        newColumn,
-        ...columns.slice(focusedColumn + 1),
-    ];
-}
-
-function insertWindowBetweenMrus(
-    window: Meta.Window,
-    mrus: Meta.Window[],
-    columns: Column[],
-    focusedColumn: number | undefined,
-    workspace: Rect,
-) {
-    const [prevFocusedWindow, prevPrevFocusedWindow] = mrus;
-
-    if (
-        prevFocusedWindow === undefined ||
-        prevPrevFocusedWindow === undefined
+    private alignToTopMostItemForLazyFollowOnCrossAxis(
+        topMostItem: Item,
+        items: Item[],
     ) {
-        return insertWindowOnLeftOfFocus(
-            window,
-            mrus,
-            columns,
-            focusedColumn,
-            workspace,
-        );
+        const topMostIndex = items.indexOf(topMostItem);
+        const placedItem = topMostItem.clone({ rect: { y: 0 } });
+
+        return this.alignItems(topMostIndex, items, [placedItem]);
     }
 
-    const prevCol = columns.find((col) => col.contains(prevFocusedWindow));
-    const prevPrevCol = columns.find((col) =>
-        col.contains(prevPrevFocusedWindow),
-    );
+    private alignToBottomMostItemForLazyFollowOnCrossAxis(
+        bottomMostItem: Item,
+        items: Item[],
+        workspace: Rect,
+    ) {
+        const bottomMostIndex = items.indexOf(bottomMostItem);
+        const placedItem = bottomMostItem.clone({
+            rect: { y: workspace.height - bottomMostItem.rect.height },
+        });
 
-    Debug.assert(
-        prevCol !== undefined && prevPrevCol !== undefined,
-        "MRUs not found in workspace",
-    );
+        return this.alignItems(bottomMostIndex, items, [placedItem]);
+    }
 
-    const direction = prevCol.rect.x - prevPrevCol.rect.x;
+    private centerAllItemsOnCrossAxis(items: Item[], workspace: Rect) {
+        const totalHeight = this.calculateTotalHeight(items);
+        const [firstItem] = items;
+        const placedFirstItem = firstItem.clone({
+            rect: { y: Math.floor(workspace.height / 2 - totalHeight / 2) },
+        });
 
-    if (direction > 0) {
-        return insertWindowOnLeftOfFocus(
-            window,
-            mrus,
-            columns,
-            focusedColumn,
-            workspace,
+        return this.alignItems(0, items, [placedFirstItem]);
+    }
+
+    private insertWindowOnLeftOfFocus(
+        window: Meta.Window,
+        mrus: Meta.Window[],
+        columns: Column[],
+        focusedColumn: number | undefined,
+        workspace: Rect,
+    ) {
+        const windowFrame = window.get_frame_rect();
+        const [prevFocusedWindow] = mrus;
+        const prevCol =
+            prevFocusedWindow &&
+            columns.find((col) => col.contains(prevFocusedWindow));
+        const newColumn = new Column({
+            focusedItem: 0,
+            items: [
+                new Item({
+                    value: window,
+                    rect: {
+                        x: prevCol ? prevCol.rect.x - windowFrame.width : 0,
+                        y: Math.floor(
+                            workspace.height / 2 - windowFrame.height / 2,
+                        ),
+                        width: windowFrame.width,
+                        height: windowFrame.height,
+                    },
+                }),
+            ],
+        });
+
+        if (focusedColumn === undefined) {
+            return [newColumn];
+        }
+
+        return [
+            ...columns.slice(0, focusedColumn),
+            newColumn,
+            ...columns.slice(focusedColumn),
+        ];
+    }
+
+    private insertWindowOnRightOfFocus(
+        window: Meta.Window,
+        mrus: Meta.Window[],
+        columns: Column[],
+        focusedColumn: number | undefined,
+        workspace: Rect,
+    ) {
+        const windowFrame = window.get_frame_rect();
+        const [prevFocusedWindow] = mrus;
+        const prevCol =
+            prevFocusedWindow &&
+            columns.find((col) => col.contains(prevFocusedWindow));
+        const newColumn = new Column({
+            focusedItem: 0,
+            items: [
+                new Item({
+                    value: window,
+                    rect: {
+                        x: prevCol ? prevCol.rect.x + windowFrame.width : 0,
+                        y: Math.floor(
+                            workspace.height / 2 - windowFrame.height / 2,
+                        ),
+                        width: windowFrame.width,
+                        height: windowFrame.height,
+                    },
+                }),
+            ],
+        });
+
+        if (focusedColumn === undefined) {
+            return [newColumn];
+        }
+
+        return [
+            ...columns.slice(0, focusedColumn + 1),
+            newColumn,
+            ...columns.slice(focusedColumn + 1),
+        ];
+    }
+
+    private insertWindowBetweenMrus(
+        window: Meta.Window,
+        mrus: Meta.Window[],
+        columns: Column[],
+        focusedColumn: number | undefined,
+        workspace: Rect,
+    ) {
+        const [prevFocusedWindow, prevPrevFocusedWindow] = mrus;
+
+        if (
+            prevFocusedWindow === undefined ||
+            prevPrevFocusedWindow === undefined
+        ) {
+            return this.insertWindowOnLeftOfFocus(
+                window,
+                mrus,
+                columns,
+                focusedColumn,
+                workspace,
+            );
+        }
+
+        const prevCol = columns.find((col) => col.contains(prevFocusedWindow));
+        const prevPrevCol = columns.find((col) =>
+            col.contains(prevPrevFocusedWindow),
         );
-    } else {
-        return insertWindowOnRightOfFocus(
-            window,
-            mrus,
-            columns,
-            focusedColumn,
-            workspace,
+
+        Debug.assert(
+            prevCol !== undefined && prevPrevCol !== undefined,
+            "MRUs not found in workspace",
         );
+
+        const direction = prevCol.rect.x - prevPrevCol.rect.x;
+
+        if (direction > 0) {
+            return this.insertWindowOnLeftOfFocus(
+                window,
+                mrus,
+                columns,
+                focusedColumn,
+                workspace,
+            );
+        } else {
+            return this.insertWindowOnRightOfFocus(
+                window,
+                mrus,
+                columns,
+                focusedColumn,
+                workspace,
+            );
+        }
     }
 }
 
