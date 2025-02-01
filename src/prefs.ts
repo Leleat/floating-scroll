@@ -6,7 +6,11 @@ import {
 } from "./prefs/dependencies.js";
 
 import { type FsShortcutRow } from "./prefs/fsShortcutRow.js";
-import { ShortcutKey, updateMultiStageShortcutActivators } from "./shared.js";
+import {
+    SettingsKey,
+    ShortcutKey,
+    updateMultiStageShortcutActivators,
+} from "./shared.js";
 
 export default class Prefs extends ExtensionPreferences {
     async fillPreferencesWindow(window: Adw.PreferencesWindow) {
@@ -32,6 +36,7 @@ export default class Prefs extends ExtensionPreferences {
 
         bindComboRows(settings, builder);
         bindShortcuts(settings, builder);
+        bindSpinbuttons(settings, builder);
 
         // We disable multi-stage shortcut activators when opening the shortcut
         // editor so that the key combos for the multi-stage shortcut activator
@@ -44,9 +49,6 @@ export default class Prefs extends ExtensionPreferences {
         updateMultiStageShortcutActivators(settings);
     }
 
-    /**
-     * @param window
-     */
     private loadResources(window: Adw.PreferencesWindow) {
         const resources = Gio.Resource.load(
             import.meta.url.replace(
@@ -63,10 +65,6 @@ export default class Prefs extends ExtensionPreferences {
     }
 }
 
-/**
- * @param settings
- * @param builder
- */
 function bindShortcuts(settings: Gio.Settings, builder: Gtk.Builder) {
     const shortcuts: ShortcutKey[] = [
         "move-focus-left",
@@ -90,10 +88,6 @@ function bindShortcuts(settings: Gio.Settings, builder: Gtk.Builder) {
     });
 }
 
-/**
- * @param settings
- * @param builder
- */
 function bindComboRows(settings: Gio.Settings, builder: Gtk.Builder) {
     const comboRows = [
         "focus-behavior-main-axis",
@@ -108,5 +102,18 @@ function bindComboRows(settings: Gio.Settings, builder: Gtk.Builder) {
             settings.set_enum(key, widget.get_selected());
         });
         widget.set_selected(settings.get_enum(key));
+    });
+}
+
+function bindSpinbuttons(settings: Gio.Settings, builder: Gtk.Builder) {
+    const spinButtons: SettingsKey[] = ["window-peeking"];
+
+    spinButtons.forEach((key) => {
+        settings.bind(
+            key,
+            builder.get_object(key),
+            "value",
+            Gio.SettingsBindFlags.DEFAULT,
+        );
     });
 }

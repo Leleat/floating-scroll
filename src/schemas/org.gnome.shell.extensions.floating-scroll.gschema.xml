@@ -34,6 +34,10 @@
             <default>'left'</default>
             <summary>Initial position when opening a window</summary>
         </key>
+        <key name="window-peeking" type="i">
+            <default>20</default>
+            <summary>Amount of windows peeking in at the screen edge when using the lazy follow focus mode</summary>
+        </key>
 
         <!--                  -->
         <!--    Shortcuts     -->

@@ -556,7 +556,6 @@ class WorkspaceModel {
                                 fromColumn.focusedItem,
                                 1,
                             ),
-                            this.workspaceModelManager.getWindows(),
                             this.workArea,
                         ),
                     }),
@@ -619,7 +618,6 @@ class WorkspaceModel {
                                 fromColumn.focusedItem,
                                 1,
                             ),
-                            this.workspaceModelManager.getWindows(),
                             this.workArea,
                         ),
                     }),
@@ -723,7 +721,6 @@ class WorkspaceModel {
             items: this.calculatePlacementOnCrossAxis(
                 focusedItem,
                 items,
-                this.workspaceModelManager.getWindows(),
                 this.workArea,
             ),
         });
@@ -1048,15 +1045,23 @@ class WorkspaceModel {
     }
 
     private alignToLeftMostColForLazyFollowOnMainAxis(
-        leftMostColumn: Column,
+        leftMostFullyVisColumn: Column,
         columns: Column[],
     ) {
-        const leftMostIndex = columns.indexOf(leftMostColumn);
+        const leftMostIndex = columns.indexOf(leftMostFullyVisColumn);
+        const windowsOffscreenOnLeft = leftMostIndex > 0;
+        const peekingAmount =
+            windowsOffscreenOnLeft ? Settings.getWindowPeeking() : 0;
         const placedCol = new Column({
-            focusedItem: leftMostColumn.focusedItem,
-            items: leftMostColumn.items.map((item) => {
+            focusedItem: leftMostFullyVisColumn.focusedItem,
+            items: leftMostFullyVisColumn.items.map((item) => {
                 return item.clone({
-                    rect: { x: leftMostColumn.rect.width - item.rect.width },
+                    rect: {
+                        x:
+                            leftMostFullyVisColumn.rect.width -
+                            item.rect.width +
+                            peekingAmount,
+                    },
                 });
             }),
         });
@@ -1065,16 +1070,24 @@ class WorkspaceModel {
     }
 
     private alignToRightMostColForLazyFollowOnMainAxis(
-        rightMostColumn: Column,
+        rightMostFullyVisColumn: Column,
         columns: Column[],
         workspace: Rect,
     ) {
-        const rightMostIndex = columns.indexOf(rightMostColumn);
+        const rightMostIndex = columns.indexOf(rightMostFullyVisColumn);
+        const windowsOffscreenOnRight = rightMostIndex < columns.length - 1;
+        const peekingAmount =
+            windowsOffscreenOnRight ? Settings.getWindowPeeking() : 0;
         const placedCol = new Column({
-            focusedItem: rightMostColumn.focusedItem,
-            items: rightMostColumn.items.map((item) => {
+            focusedItem: rightMostFullyVisColumn.focusedItem,
+            items: rightMostFullyVisColumn.items.map((item) => {
                 return item.clone({
-                    rect: { x: workspace.width - rightMostColumn.rect.width },
+                    rect: {
+                        x:
+                            workspace.width -
+                            rightMostFullyVisColumn.rect.width -
+                            peekingAmount,
+                    },
                 });
             }),
         });

@@ -49,7 +49,8 @@ export type SettingsKey =
     | "debug-level"
     | "focus-behavior-main-axis"
     | "focus-behavior-cross-axis"
-    | "window-opening-position";
+    | "window-opening-position"
+    | "window-peeking";
 
 /** The amount of multi-stage shortcut activators defined in the schema */
 export const MULTI_STAGE_SHORTCUT_ACTIVATOR_COUNT = 30;

@@ -21,5 +21,22 @@
         </child>
       </object>
     </child>
+    <child>
+      <object class="AdwPreferencesGroup">
+        <child>
+          <object class="AdwSpinRow" id="window-peeking">
+            <property name="title" translatable="yes" comments="">Window Peeking</property>
+            <property name="activatable-widget">window-peeking</property>
+            <property name="adjustment">
+              <object class="GtkAdjustment">
+                <property name="upper">100</property>
+                <property name="step-increment">1</property>
+                <property name="page-increment">10</property>
+              </object>
+            </property>
+          </object>
+        </child>
+      </object>
+    </child>
   </object>
 </interface>
