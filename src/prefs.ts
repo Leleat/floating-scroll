@@ -1,10 +1,16 @@
-import { ExtensionPreferences, Gio, Gtk } from "./prefs/dependencies.js";
+import {
+    type Adw,
+    ExtensionPreferences,
+    Gio,
+    Gtk,
+} from "./prefs/dependencies.js";
 
-import { updateMultiStageShortcutActivators } from "./shared.js";
+import { type FsShortcutRow } from "./prefs/fsShortcutRow.js";
+import { ShortcutKey, updateMultiStageShortcutActivators } from "./shared.js";
 
 export default class Prefs extends ExtensionPreferences {
-    async fillPreferencesWindow(window) {
-        this._loadResources(window);
+    async fillPreferencesWindow(window: Adw.PreferencesWindow) {
+        this.loadResources(window);
 
         // Register our custom widgets
         await Promise.all([
@@ -18,8 +24,8 @@ export default class Prefs extends ExtensionPreferences {
         builder.add_from_resource("/ui/pages/windowFocus.ui");
         builder.add_from_resource("/ui/pages/shortcuts.ui");
 
-        window.add(builder.get_object("window_placement"));
-        window.add(builder.get_object("window_focus"));
+        window.add(builder.get_object("window-placement"));
+        window.add(builder.get_object("window-focus"));
         window.add(builder.get_object("shortcuts"));
 
         const settings = this.getSettings();
@@ -39,9 +45,9 @@ export default class Prefs extends ExtensionPreferences {
     }
 
     /**
-     * @param {Adw.PreferencesWindow} window
+     * @param window
      */
-    _loadResources(window) {
+    private loadResources(window: Adw.PreferencesWindow) {
         const resources = Gio.Resource.load(
             import.meta.url.replace(
                 /file:\/\/(.*)\/prefs.js$/,
@@ -58,11 +64,11 @@ export default class Prefs extends ExtensionPreferences {
 }
 
 /**
- * @param {Gio.Settings} settings
- * @param {Gtk.Builder} builder
+ * @param settings
+ * @param builder
  */
-function bindShortcuts(settings, builder) {
-    [
+function bindShortcuts(settings: Gio.Settings, builder: Gtk.Builder) {
+    const shortcuts: ShortcutKey[] = [
         "move-focus-left",
         "move-focus-right",
         "move-focus-up",
@@ -75,19 +81,20 @@ function bindShortcuts(settings, builder) {
         "move-item-right",
         "move-item-up",
         "move-item-down",
-    ].forEach((key) => {
-        /** @type {import("./prefs/fsShortcutRow.js").FsShortcutRow} */
-        const widget = getWidget(builder, key);
+    ];
+
+    shortcuts.forEach((key) => {
+        const widget: FsShortcutRow = builder.get_object(key);
 
         widget.bind(settings, key);
     });
 }
 
 /**
- * @param {Gio.Settings} settings
- * @param {Gtk.Builder} builder
+ * @param settings
+ * @param builder
  */
-function bindComboRows(settings, builder) {
+function bindComboRows(settings: Gio.Settings, builder: Gtk.Builder) {
     const comboRows = [
         "focus-behavior-main-axis",
         // "focus-behavior-cross-axis",
@@ -95,21 +102,11 @@ function bindComboRows(settings, builder) {
     ];
 
     comboRows.forEach((key) => {
-        const widget = builder.get_object(key.replaceAll("-", "_"));
+        const widget: Adw.ComboRow = builder.get_object(key);
 
         widget.connect("notify::selected", () => {
             settings.set_enum(key, widget.get_selected());
         });
         widget.set_selected(settings.get_enum(key));
     });
-}
-
-/**
- * @param {Gtk.Builder} builder
- * @param {string} key
- *
- * @returns {Gtk.Widget}
- */
-function getWidget(builder, key) {
-    return builder.get_object(key.replaceAll("-", "_"));
 }

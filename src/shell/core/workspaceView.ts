@@ -1,11 +1,12 @@
 import { GLib } from "../dependencies.js";
+import { Debug } from "../utils/debug.js";
 
 import { Timeouts } from "../utils/timeouts.js";
-import { EventGenerator, EventProcessor } from "./eventSystem.js";
+import { type Event, EventGenerator, EventProcessor } from "./eventSystem.js";
+import { WorkspaceModel } from "./workspaceModel.js";
 import { WorkspaceModelManager } from "./workspaceModelManager.js";
 
-/** @type {WorkspaceView} */
-let SINGLETON = null;
+let SINGLETON: WorkspaceView = null!;
 
 function enable() {
     SINGLETON = new WorkspaceView();
@@ -13,45 +14,39 @@ function enable() {
 
 function disable() {
     SINGLETON.destroy();
-    SINGLETON = null;
+    SINGLETON = null!;
 }
 
 class WorkspaceView {
-    /** @type {EventGenerator} */
-    #eventGenerator = new EventGenerator();
-
-    /** @type {EventProcessor} */
-    #eventProcessor = new EventProcessor();
+    private eventGenerator = new EventGenerator();
+    private eventProcessor = new EventProcessor();
 
     constructor() {
-        this.#eventGenerator.sub(this, (e) => this.#onEvent(e));
+        this.eventGenerator.sub(this, (e) => this.onEvent(e));
     }
 
     destroy() {
-        this.#eventGenerator.destroy();
-        this.#eventGenerator = null;
+        this.eventGenerator.destroy();
+        this.eventGenerator = null!;
 
-        this.#eventProcessor.destroy();
-        this.#eventProcessor = null;
+        this.eventProcessor.destroy();
+        this.eventProcessor = null!;
     }
 
-    /**
-     * @param {Event} event
-     */
-    #onEvent(event) {
-        const result = this.#eventProcessor.processEvent(event);
+    private onEvent(event: Event) {
+        this.eventProcessor
+            .processEvent(event)
+            .inspect((model) => {
+                WorkspaceModelManager.setActiveWorkspaceModel(model);
 
-        if (result.ok) {
-            WorkspaceModelManager.setActiveWorkspaceModel(result.model);
-
-            this.#update(result.model);
-        }
+                this.update(model);
+            })
+            .inspectErr((e) => {
+                Debug.log(e);
+            });
     }
 
-    /**
-     * @param {import("./workspaceModel.js").WorkspaceModel} model
-     */
-    #update(model) {
+    private update(model: WorkspaceModel) {
         // TODO Just quick hack to not redo the updates for all events since
         // TODO many "focus-change" events are sent, for instance, when opening
         // TODO a window

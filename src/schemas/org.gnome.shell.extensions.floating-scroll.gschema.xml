@@ -9,6 +9,13 @@
         <value value='1' nick='right' />
         <value value='2' nick='mru' />
     </enum>
+    <enum id='org.gnome.shell.extensions.floating-scroll.debug-level'>
+        <value value='100' nick='debug' />
+        <value value='200' nick='warn' />
+        <value value='300' nick='trace' />
+        <value value='400' nick='error' />
+        <value value='1000' nick='off' />
+    </enum>
 
     <schema id="org.gnome.shell.extensions.floating-scroll" path="/org/gnome/shell/extensions/floating-scroll/">
         <!--                               -->
@@ -92,9 +99,9 @@
             <summary>Private key: Saves the overridden native settings</summary>
         </key>
 
-        <key name="log-level" type="i">
-            <default>1000</default>
-            <summary>Private key: Determines the log level</summary>
+        <key name="debug-level" enum="org.gnome.shell.extensions.floating-scroll.debug-level">
+            <default>'error'</default>
+            <summary>Private key: Determines the debug level</summary>
         </key>
 
         <key name="multi-stage-shortcut-activator-0" type="as">

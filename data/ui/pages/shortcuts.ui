@@ -7,22 +7,22 @@
       <object class="AdwPreferencesGroup">
         <property name="title" translatable="yes">Move Focus</property>
         <child>
-          <object class="FsShortcutRow" id="move_focus_left">
+          <object class="FsShortcutRow" id="move-focus-left">
             <property name="title" translatable="yes">Focus leftward</property>
           </object>
         </child>
         <child>
-          <object class="FsShortcutRow" id="move_focus_right">
+          <object class="FsShortcutRow" id="move-focus-right">
             <property name="title" translatable="yes">Focus rightward</property>
           </object>
         </child>
         <child>
-          <object class="FsShortcutRow" id="move_focus_up">
+          <object class="FsShortcutRow" id="move-focus-up">
             <property name="title" translatable="yes">Focus upward</property>
           </object>
         </child>
         <child>
-          <object class="FsShortcutRow" id="move_focus_down">
+          <object class="FsShortcutRow" id="move-focus-down">
             <property name="title" translatable="yes">Focus downward</property>
           </object>
         </child>
@@ -32,22 +32,22 @@
       <object class="AdwPreferencesGroup">
         <property name="title" translatable="yes">Move Item</property>
         <child>
-          <object class="FsShortcutRow" id="move_item_left">
+          <object class="FsShortcutRow" id="move-item-left">
             <property name="title" translatable="yes">Move Item Left</property>
           </object>
         </child>
         <child>
-          <object class="FsShortcutRow" id="move_item_right">
+          <object class="FsShortcutRow" id="move-item-right">
             <property name="title" translatable="yes">Move Item Right</property>
           </object>
         </child>
         <child>
-          <object class="FsShortcutRow" id="move_item_up">
+          <object class="FsShortcutRow" id="move-item-up">
             <property name="title" translatable="yes">Move Item Up</property>
           </object>
         </child>
         <child>
-          <object class="FsShortcutRow" id="move_item_down">
+          <object class="FsShortcutRow" id="move-item-down">
             <property name="title" translatable="yes">Move Item Down</property>
           </object>
         </child>
@@ -57,22 +57,22 @@
       <object class="AdwPreferencesGroup">
         <property name="title" translatable="yes">Move Column</property>
         <child>
-          <object class="FsShortcutRow" id="move_column_up">
+          <object class="FsShortcutRow" id="move-column-up">
             <property name="title" translatable="yes">Move Column Up</property>
           </object>
         </child>
         <child>
-          <object class="FsShortcutRow" id="move_column_down">
+          <object class="FsShortcutRow" id="move-column-down">
             <property name="title" translatable="yes">Move Column Down</property>
           </object>
         </child>
         <child>
-          <object class="FsShortcutRow" id="move_column_left">
+          <object class="FsShortcutRow" id="move-column-left">
             <property name="title" translatable="yes">Move Column Left</property>
           </object>
         </child>
         <child>
-          <object class="FsShortcutRow" id="move_column_right">
+          <object class="FsShortcutRow" id="move-column-right">
             <property name="title" translatable="yes">Move Column Right</property>
           </object>
         </child>

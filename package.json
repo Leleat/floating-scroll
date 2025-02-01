@@ -7,8 +7,10 @@
     "build": "./scripts/build.sh",
     "build:dev": "./scripts/build.sh --unsafe-reload",
     "build:install": "./scripts/build.sh --install",
-    "check:lint": "eslint src/ tests/",
-    "check:format": "prettier -c src/ tests/",
+    "format": "prettier --write --no-error-on-unmatched-pattern {src,tests}/**/*.{js,ts}",
+    "check:lint": "eslint --no-error-on-unmatched-pattern {src,tests}/**/*.{js,ts}",
+    "check:format": "prettier --check --no-error-on-unmatched-pattern {src,tests}/**/*.{js,ts}",
+    "check:types": "tsc -noEmit",
     "test": "vitest",
     "translations:update": "./scripts/update-translations.sh"
   },
@@ -31,12 +33,17 @@
   "license": "GPL-2.0-or-later",
   "devDependencies": {
     "@eslint/js": "^9.18.0",
-    "@girs/gjs": "^4.0.0-beta.19",
-    "@girs/gnome-shell": "^47.0.0",
+    "@girs/gnome-shell": "^47.0.1",
+    "@types/eslint__js": "^8.42.3",
     "@vitest/coverage-v8": "^2.1.8",
+    "esbuild": "^0.24.2",
+    "esbuild-plugin-tsc": "^0.4.0",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^9.1.0",
+    "globals": "^15.14.0",
     "prettier": "^3.4.2",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.22.0",
     "vitest": "^2.1.8"
   }
 }

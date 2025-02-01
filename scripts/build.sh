@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 
+# ==============================================================================
+# This script builds the zip package for the extension. It compiles translations
+# and resources, if there are any. It also installs the extension, if requested.
+# Use `--help` for more information.
+# ==============================================================================
+
 set -e
 
 function compile_resources() {
@@ -32,16 +38,56 @@ function compile_translations() {
 
 	for PO_FILE in po/*.po; do
 		LANG=$(basename "$PO_FILE" .po)
-		mkdir -p "src/locale/$LANG/LC_MESSAGES"
-		msgfmt -c "$PO_FILE" -o "src/locale/$LANG/LC_MESSAGES/$UUID.mo"
+		mkdir -p "$JS_DIR/locale/$LANG/LC_MESSAGES"
+		msgfmt -c "$PO_FILE" -o "$JS_DIR/locale/$LANG/LC_MESSAGES/$UUID.mo"
 	done
 
 	echo "Translations compiled."
 }
 
 function build_extension_package() {
+	# Compile TypeScript files, if used
+	if [ "$USING_TYPESCRIPT" = "true" ]; then
+		if ! (command -v npm &> /dev/null); then
+			echo "ERROR: npm isn't installed. Can't compile TypeScript files. Exiting..."
+
+			exit 1
+		fi
+
+		if find . -maxdepth 1 -type d | grep -q "dist"; then
+			echo "Removing old TypeScript dist/..."
+			rm -rf $TYPESCRIPT_OUT_DIR
+			echo "Done."
+		fi
+
+		if ! (find . -maxdepth 1 -type d | grep -q "node_modules"); then
+			echo "Installing dependencies from NPM to compile TypeScript..."
+			npm install > /dev/null
+			echo "Dependencies installed."
+		fi
+
+		echo "Compiling TypeScript files..."
+		if find scripts/ -type f | grep -q "esbuild.js"; then
+			node ./scripts/esbuild.js
+		else
+			npx tsc
+		fi
+		echo "Done."
+
+		if find src/ -type f | grep -qv ".ts"; then
+			echo "Copying non-TypeScript src files to the dist directory..."
+			(
+				cd src/
+				find . -type f ! -name '*.ts' | while read -r FILE; do
+					cp --parents "$FILE" ../dist/
+				done
+			)
+			echo "Done."
+		fi
+	fi
+
 	# Compile translations, if there are any
-	if find po/ | grep -q ".po$" ; then
+	if (find po/ -type f | grep ".po$") &> /dev/null; then
 		if command -v msgfmt &> /dev/null; then
 			compile_translations
 		else
@@ -50,7 +96,7 @@ function build_extension_package() {
 	fi
 
 	# Compile resources, if there are any
-	if find data/ -type f | grep -q "."; then
+	if (find data/ -type f | grep ".") &> /dev/null; then
 		if command -v glib-compile-resources &> /dev/null; then
 			compile_resources
 		else
@@ -64,7 +110,7 @@ function build_extension_package() {
 
 	(
 		rm -f "$UUID".shell-extension.zip
-		cd src && zip -qr ../"$UUID".shell-extension.zip \
+		cd "$JS_DIR" && zip -qr ../"$UUID".shell-extension.zip \
 			. \
 			../metadata.json \
 			../LICENSE \
@@ -131,15 +177,15 @@ function usage() {
 	Options:
 	  -i, --install         Install the extension after building
 	  -r, --unsafe-reload   Build and install the extension, then reload GNOME
-							Shell. This is for development purposes as it restarts
-							GNOME Shell with an X11 session by relying on the eval
-							method. To use the eval method, you need to enable
-							GNOME's unsafe mode. So this options is intended for
-							safe environments. A dev workflow could look like this:
-							Create a VM running GNOME on X11. Create a shared
-							folder with your project in it. Develop on the host but
-							run the build script within the VM using this option to
-							quickly test your extension
+	                        Shell. This is for development purposes as it restarts
+	                        GNOME Shell with an X11 session by relying on the eval
+	                        method. To use the eval method, you need to enable
+	                        GNOME's unsafe mode. So this options is intended for
+	                        safe environments. A dev workflow could look like this:
+	                        Create a VM running GNOME on X11. Create a shared
+	                        folder with your project in it. Develop on the host but
+	                        run the build script within the VM using this option to
+	                        quickly test your extension
 	  -h, --help            Display this help message
 	EOF
 }
@@ -153,6 +199,14 @@ cd -- "$( dirname "$0" )/../"
 UUID=$(grep -oP '"uuid": "\K[^"]+' metadata.json)
 RESOURCE_XML="$UUID.gresource.xml"
 RESOURCE_TARGET="$UUID.gresource"
+USING_TYPESCRIPT=$(find . -maxdepth 1 -type f | grep -q "tsconfig.json" && echo "true" || echo "false")
+TYPESCRIPT_OUT_DIR="dist"
+
+if [ "$USING_TYPESCRIPT" = "true" ]; then
+	JS_DIR="$TYPESCRIPT_OUT_DIR"
+else
+	JS_DIR="src"
+fi
 
 if [ $# -eq 0 ]; then
 	build_extension_package

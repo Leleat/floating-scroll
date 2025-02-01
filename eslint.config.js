@@ -1,18 +1,22 @@
-import js from "@eslint/js";
-import eslintConfigPrettier from "eslint-config-prettier";
+// @ts-check
 
-export default [
-    js.configs.recommended,
-    eslintConfigPrettier,
+import eslint from "@eslint/js";
+import globals from "globals";
+import tseslint from "typescript-eslint";
+
+export default tseslint.config(
     {
         languageOptions: {
+            ecmaVersion: 2022,
+            sourceType: "module",
             globals: {
+                ...globals.es2021,
                 ARGV: "readonly",
                 console: "readonly",
                 Debugger: "readonly",
                 GIRepositoryGType: "readonly",
-                globalThis: "readonly",
                 global: "readonly",
+                globalThis: "readonly",
                 imports: "readonly",
                 Intl: "readonly",
                 log: "readonly",
@@ -20,13 +24,12 @@ export default [
                 print: "readonly",
                 printerr: "readonly",
                 process: "readonly",
-                window: "readonly",
-                TextEncoder: "readonly",
                 TextDecoder: "readonly",
+                TextEncoder: "readonly",
+                window: "readonly",
             },
         },
-        rules: {
-            curly: ["error", "all"],
-        },
     },
-];
+    eslint.configs.recommended,
+    ...tseslint.configs.recommended,
+);
