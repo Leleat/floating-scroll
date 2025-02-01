@@ -283,18 +283,15 @@ class WorkspaceModel {
             `Window not found in workspace: ${window}`,
         );
 
-        const mrus = this.workspaceModelManager.getWindows();
         const placedCols = this.calculatePlacementOnMainAxis(
             newFocusedColumn,
             this.columns,
-            mrus,
             this.workArea,
         );
         const placedFocusedCol = placedCols[newFocusedColumn];
         const placedItems = this.calculatePlacementOnCrossAxis(
             newFocusItem,
             placedFocusedCol.items,
-            mrus,
             this.workArea,
         );
 
@@ -867,7 +864,6 @@ class WorkspaceModel {
     private calculatePlacementOnMainAxis(
         newFocusColumn: number,
         columns: Column[],
-        mrus: Meta.Window[],
         workspace: Rect,
     ) {
         const focusBehaviorMainAxis = Settings.getFocusBehaviorMainAxis();
@@ -878,7 +874,6 @@ class WorkspaceModel {
             return this.lazyFollowOnMainAxis(
                 newFocusColumn,
                 columns,
-                mrus,
                 workspace,
             );
         }
@@ -891,7 +886,6 @@ class WorkspaceModel {
     private calculatePlacementOnCrossAxis(
         newFocusItem: number,
         items: Item[],
-        mrus: Meta.Window[],
         workspace: Rect,
     ) {
         const focusBehaviorCrossAxis = Settings.getFocusBehaviorCrossAxis();
@@ -899,12 +893,7 @@ class WorkspaceModel {
         if (focusBehaviorCrossAxis === FocusBehavior.CENTER) {
             return this.centerOnCrossAxis(newFocusItem, items, workspace);
         } else if (focusBehaviorCrossAxis === FocusBehavior.LAZY_FOLLOW) {
-            return this.lazyFollowOnCrossAxis(
-                newFocusItem,
-                items,
-                mrus,
-                workspace,
-            );
+            return this.lazyFollowOnCrossAxis(newFocusItem, items, workspace);
         }
 
         throw new Error(
@@ -958,9 +947,9 @@ class WorkspaceModel {
     private lazyFollowOnMainAxis(
         newFocusColumn: number,
         columns: Column[],
-        mrus: Meta.Window[],
         workspace: Rect,
     ) {
+        const mrus = this.workspaceModelManager.getWindows();
         const visibleColumns = [columns[newFocusColumn]];
 
         while (true) {
@@ -1096,9 +1085,9 @@ class WorkspaceModel {
     private lazyFollowOnCrossAxis(
         newFocusItem: number,
         items: Item[],
-        mrus: Meta.Window[],
         workspace: Rect,
     ) {
+        const mrus = this.workspaceModelManager.getWindows();
         const visibleItems = [items[newFocusItem]];
 
         while (true) {
