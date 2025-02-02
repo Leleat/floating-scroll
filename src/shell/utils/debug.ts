@@ -65,18 +65,6 @@ class DebugModule {
         }
     }
 
-    indentLog(): DebugModule {
-        console.group();
-
-        return this;
-    }
-
-    dedentLog(): DebugModule {
-        console.groupEnd();
-
-        return this;
-    }
-
     /**
      * @param data
      *
