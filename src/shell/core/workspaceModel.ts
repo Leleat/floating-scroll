@@ -8,7 +8,8 @@ import {
 } from "../../shared.js";
 import { Debug } from "../utils/debug.js";
 import { Settings } from "../utils/settings.js";
-import { type WorkspaceModelManager } from "./workspaceModelManager.js";
+import { WorkspaceModelManager } from "./workspaceModelManager.js";
+import { Signals } from "../dependencies.js";
 
 // This type does not guarantee the non-emptiness via the type system. This is
 // just a helper to make the type more descriptive. The guarantee should happen
@@ -208,12 +209,10 @@ class WorkspaceGrid {
     }
 }
 
-class WorkspaceModel {
+class WorkspaceModel extends Signals.EventEmitter {
     static build({
-        workspaceModelManager,
         initialWindow,
     }: {
-        workspaceModelManager: typeof WorkspaceModelManager;
         initialWindow: Meta.Window;
     }): WorkspaceModel {
         const frameRect = initialWindow.get_frame_rect();
@@ -227,7 +226,6 @@ class WorkspaceModel {
             },
         });
         const unplacedModel = new WorkspaceModel({
-            workspaceModelManager,
             columns: [new Column({ items: [item] })],
             focusedColumn: 0,
             workArea: initialWindow.get_work_area_current_monitor(),
@@ -239,19 +237,18 @@ class WorkspaceModel {
     private readonly columns: NonEmptyArray<Column>;
     private readonly focusedColumn: number;
     private readonly workArea: Rect;
-    private readonly workspaceModelManager: typeof WorkspaceModelManager;
 
     constructor({
-        workspaceModelManager,
         columns,
         focusedColumn,
         workArea,
     }: {
-        workspaceModelManager: typeof WorkspaceModelManager;
         columns: NonEmptyArray<Column>;
         focusedColumn: number;
         workArea: Rect;
     }) {
+        super();
+
         Debug.assert(
             Array.isArray(columns) &&
                 columns.length > 0 &&
@@ -259,7 +256,6 @@ class WorkspaceModel {
             `columns must be a non-empty array of columns. Current value is: ${columns}`,
         );
 
-        this.workspaceModelManager = workspaceModelManager;
         this.columns = columns;
         this.focusedColumn = focusedColumn;
         this.workArea = workArea;
@@ -268,33 +264,25 @@ class WorkspaceModel {
     destroy() {
         this.columns.forEach((col) => col.destroy());
         // @ts-expect-error null out
-        this.columns.length = null;
-
-        Debug.assert(
-            this === this.workspaceModelManager.getWorkspaceModel(),
-            "WorkspaceModelManager does not have 'this' as the current model",
-        );
-        this.workspaceModelManager.removeWorkspaceModel();
-        // @ts-expect-error null out
-        this.workspaceModelManager = null;
+        this.columns = null;
 
         // @ts-expect-error null out
         this.workArea = null;
+
+        this.emit("destroy");
+        this.disconnectAll();
     }
 
     clone({
         focusedColumn = this.focusedColumn,
         columns = this.columns.map((col) => col.clone()),
         workArea = this.workArea,
-        workspaceModelManager = this.workspaceModelManager,
     }: {
         focusedColumn?: number;
         columns?: NonEmptyArray<Column>;
         workArea?: Rect;
-        workspaceModelManager?: typeof WorkspaceModelManager;
     } = {}) {
         return new WorkspaceModel({
-            workspaceModelManager,
             columns,
             focusedColumn,
             workArea,
@@ -333,7 +321,6 @@ class WorkspaceModel {
 
         return Result.Ok<WorkspaceModel>(
             new WorkspaceModel({
-                workspaceModelManager: this.workspaceModelManager,
                 columns: placedCols.with(
                     newFocusedColumn,
                     new Column({
@@ -428,7 +415,6 @@ class WorkspaceModel {
 
         const window = col.items[col.focusedItem].value;
         const model = new WorkspaceModel({
-            workspaceModelManager: this.workspaceModelManager,
             workArea: this.workArea,
             focusedColumn: this.focusedColumn - 1,
             columns: [
@@ -453,7 +439,6 @@ class WorkspaceModel {
 
         const window = col.items[col.focusedItem].value;
         const model = new WorkspaceModel({
-            workspaceModelManager: this.workspaceModelManager,
             workArea: this.workArea,
             focusedColumn: this.focusedColumn + 1,
             columns: [
@@ -477,7 +462,6 @@ class WorkspaceModel {
         }
 
         const model = new WorkspaceModel({
-            workspaceModelManager: this.workspaceModelManager,
             workArea: this.workArea,
             focusedColumn: this.focusedColumn,
             columns: this.columns.with(
@@ -510,7 +494,6 @@ class WorkspaceModel {
         }
 
         const model = new WorkspaceModel({
-            workspaceModelManager: this.workspaceModelManager,
             workArea: this.workArea,
             focusedColumn: this.focusedColumn,
             columns: this.columns.with(
@@ -583,7 +566,6 @@ class WorkspaceModel {
 
         return new WorkspaceModel({
             columns: newColumns,
-            workspaceModelManager: this.workspaceModelManager,
             focusedColumn: newFocusedColumn,
             workArea: this.workArea,
         }).relayout(window);
@@ -646,7 +628,6 @@ class WorkspaceModel {
 
         return new WorkspaceModel({
             columns: newColumns,
-            workspaceModelManager: this.workspaceModelManager,
             workArea: this.workArea,
             focusedColumn: this.focusedColumn + (addedANewColumn ? 1 : 0),
         }).relayout(window);
@@ -662,9 +643,9 @@ class WorkspaceModel {
 
         let cols;
         const openingPosition = Settings.getWindowOpeningPosition();
-        const mrus = this.workspaceModelManager
-            .getWindows()
-            .filter((w) => w !== window);
+        const mrus = WorkspaceModelManager.getWindows().filter(
+            (w) => w !== window,
+        );
 
         if (openingPosition === WindowOpeningPosition.LEFT) {
             cols = this.insertWindowOnLeftOfFocus(
@@ -698,7 +679,6 @@ class WorkspaceModel {
         }
 
         return new WorkspaceModel({
-            workspaceModelManager: this.workspaceModelManager,
             workArea: this.workArea,
             focusedColumn: -1, // will be set via relayout
             columns: cols,
@@ -729,7 +709,6 @@ class WorkspaceModel {
 
         if (column.items.length === 1) {
             return new WorkspaceModel({
-                workspaceModelManager: this.workspaceModelManager,
                 workArea: this.workArea,
                 focusedColumn: -1, // will be set via relayout
                 columns: this.columns.filter((col) => col !== column),
@@ -749,7 +728,6 @@ class WorkspaceModel {
         });
 
         return new WorkspaceModel({
-            workspaceModelManager: this.workspaceModelManager,
             workArea: this.workArea,
             focusedColumn: -1, // will be set via relayout
             columns: this.columns.with(this.columns.indexOf(column), newColumn),
@@ -964,7 +942,7 @@ class WorkspaceModel {
         columns: NonEmptyArray<Column>,
         workspace: Rect,
     ) {
-        const mrus = this.workspaceModelManager.getWindows();
+        const mrus = WorkspaceModelManager.getWindows();
         const visibleColumns = [columns[newFocusColumn]];
 
         while (true) {
@@ -1121,7 +1099,7 @@ class WorkspaceModel {
         items: NonEmptyArray<Item>,
         workspace: Rect,
     ) {
-        const mrus = this.workspaceModelManager.getWindows();
+        const mrus = WorkspaceModelManager.getWindows();
         const visibleItems = [items[newFocusItem]];
 
         while (true) {

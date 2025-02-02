@@ -32,14 +32,11 @@ class WorkspaceModelManager {
     createWorkspaceModel(initialWindow: Meta.Window): WorkspaceModel {
         Debug.assert(this.model === undefined, "A model already exists.");
 
-        return WorkspaceModel.build({
-            workspaceModelManager: this,
-            initialWindow,
-        });
+        return WorkspaceModel.build({ initialWindow });
     }
 
-    removeWorkspaceModel() {
-        Debug.assert(this.model !== undefined, "No model to remove.");
+    removeWorkspaceModel(model: WorkspaceModel) {
+        Debug.assert(this.model === model, "Trying to remove the wrong model");
 
         this.model = undefined;
     }
@@ -52,6 +49,7 @@ class WorkspaceModelManager {
         Debug.assert(this.model !== model, "Model is already set.");
 
         this.model = model;
+        this.model?.connect("destroy", () => (this.model = undefined));
     }
 }
 
