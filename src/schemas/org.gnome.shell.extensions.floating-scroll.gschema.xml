@@ -38,6 +38,10 @@
             <default>20</default>
             <summary>Amount of windows peeking in at the screen edge when using the lazy follow focus mode</summary>
         </key>
+        <key name="window-padding" type="i">
+            <default>16</default>
+            <summary>Padding between item container and window</summary>
+        </key>
 
         <!--                  -->
         <!--    Shortcuts     -->

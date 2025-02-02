@@ -106,7 +106,7 @@ function bindComboRows(settings: Gio.Settings, builder: Gtk.Builder) {
 }
 
 function bindSpinbuttons(settings: Gio.Settings, builder: Gtk.Builder) {
-    const spinButtons: SettingsKey[] = ["window-peeking"];
+    const spinButtons: SettingsKey[] = ["window-padding", "window-peeking"];
 
     spinButtons.forEach((key) => {
         settings.bind(

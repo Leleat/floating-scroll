@@ -22,6 +22,7 @@ type WorkspaceChangeResultErrors =
 class Item {
     public readonly value!: Meta.Window;
     public readonly rect!: Rect;
+    private padding!: number;
 
     constructor({
         value,
@@ -42,9 +43,22 @@ class Item {
 
         this.value = value;
         this.rect = rect;
+
+        Settings.watch(
+            "window-padding",
+            () => {
+                this.padding = Settings.getWindowPadding();
+            },
+            {
+                tracker: this,
+                immediate: true,
+            },
+        );
     }
 
     destroy() {
+        Settings.unwatch(this);
+
         // @ts-expect-error null out
         this.value = null;
         // @ts-expect-error null out
@@ -92,9 +106,9 @@ class Item {
             windowActor.show();
             this.value.move_resize_frame(
                 true,
-                workArea.x + this.rect.x,
+                workArea.x + this.rect.x + this.padding / 2,
                 workArea.y + this.rect.y,
-                this.rect.width,
+                this.rect.width - this.padding,
                 this.rect.height,
             );
         }

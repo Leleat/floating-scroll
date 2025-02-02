@@ -50,6 +50,7 @@ export type SettingsKey =
     | "focus-behavior-main-axis"
     | "focus-behavior-cross-axis"
     | "window-opening-position"
+    | "window-padding"
     | "window-peeking";
 
 /** The amount of multi-stage shortcut activators defined in the schema */
