@@ -138,14 +138,14 @@ export class Result<T> {
         return new Result<T>({ value: v });
     }
 
-    static Err<T>(e: number): Result<T> {
+    static Err<T>(e: string): Result<T> {
         return new Result<T>({ error: e });
     }
 
     private readonly value: T | undefined;
-    private readonly error: number | undefined;
+    private readonly error: string | undefined;
 
-    protected constructor({ value, error }: { value?: T; error?: number }) {
+    protected constructor({ value, error }: { value?: T; error?: string }) {
         if (value !== undefined) {
             this.value = value;
         } else {
@@ -169,7 +169,7 @@ export class Result<T> {
         return this;
     }
 
-    inspectErr(fn: (error: number) => void): this {
+    inspectErr(fn: (error: string) => void): this {
         if (this.error !== undefined) {
             fn(this.error);
         }
@@ -182,13 +182,13 @@ export class Result<T> {
         error,
     }: {
         ok: (value: T) => U;
-        error: (error: number) => V;
+        error: (error: string) => V;
     }): U | V {
         return this.value !== undefined ? ok(this.value) : error(this.error!);
     }
 
     /**
-     * @throws {number}
+     * @throws {string}
      */
     unwrap() {
         if (this.value) {

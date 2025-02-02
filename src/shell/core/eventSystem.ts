@@ -5,7 +5,7 @@ import { Debug } from "../utils/debug.js";
 import { Shortcuts } from "../utils/shortcuts.js";
 import { Timeouts } from "../utils/timeouts.js";
 import {
-    WorkspaceChangeResultErrors,
+    WorkspaceModelChangeErrors,
     WorkspaceModel,
 } from "./workspaceModel.js";
 import { WorkspaceModelManager } from "./workspaceModelManager.js";
@@ -311,7 +311,7 @@ class MoveFocusLeftShortcutEvent implements Event {
             ?.focus(global.get_current_time());
 
         return Result.Err<WorkspaceModel>(
-            WorkspaceChangeResultErrors.ONLY_FOCUS,
+            WorkspaceModelChangeErrors.NO_FOCUS_TARGET,
         );
     }
 }
@@ -325,7 +325,7 @@ class MoveFocusRightShortcutEvent implements Event {
             ?.focus(global.get_current_time());
 
         return Result.Err<WorkspaceModel>(
-            WorkspaceChangeResultErrors.ONLY_FOCUS,
+            WorkspaceModelChangeErrors.NO_FOCUS_TARGET,
         );
     }
 }
@@ -339,7 +339,7 @@ class MoveFocusUpShortcutEvent implements Event {
             ?.focus(global.get_current_time());
 
         return Result.Err<WorkspaceModel>(
-            WorkspaceChangeResultErrors.ONLY_FOCUS,
+            WorkspaceModelChangeErrors.NO_FOCUS_TARGET,
         );
     }
 }
@@ -353,7 +353,7 @@ class MoveFocusDownShortcutEvent implements Event {
             ?.focus(global.get_current_time());
 
         return Result.Err<WorkspaceModel>(
-            WorkspaceChangeResultErrors.ONLY_FOCUS,
+            WorkspaceModelChangeErrors.NO_FOCUS_TARGET,
         );
     }
 }

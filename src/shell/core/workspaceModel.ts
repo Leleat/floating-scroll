@@ -10,14 +10,16 @@ import { Debug } from "../utils/debug.js";
 import { Settings } from "../utils/settings.js";
 import { type WorkspaceModelManager } from "./workspaceModelManager.js";
 
-const WorkspaceChangeResultErrors = Object.freeze({
-    NO_WINDOW: 1,
-    /** rely on the focus signal to relayout, so ignore this */
-    ONLY_FOCUS: 2,
+const ModelChangeErrors = Object.freeze({
+    TODO: "TODO",
+    NO_ACTION_TARGET: "No target to act on found",
+    NO_FOCUS_TARGET: "No target to focus on found",
+    NO_MOVEMENT_POSSIBLE:
+        "No movement possible because item/col is already at the edge",
 });
 
-type WorkspaceChangeResultErrors =
-    (typeof WorkspaceChangeResultErrors)[keyof typeof WorkspaceChangeResultErrors];
+type ModelChangeErrors =
+    (typeof ModelChangeErrors)[keyof typeof ModelChangeErrors];
 
 class Item {
     public readonly value!: Meta.Window;
@@ -378,28 +380,26 @@ class WorkspaceModel {
 
     moveFocusedColumnUp(): Result<WorkspaceModel> {
         // TODO multi-workspace movement
-        return Result.Err<WorkspaceModel>(
-            WorkspaceChangeResultErrors.NO_WINDOW,
-        );
+        return Result.Err<WorkspaceModel>(ModelChangeErrors.TODO);
     }
 
     moveFocusedColumnDown(): Result<WorkspaceModel> {
         // TODO multi-workspace movement
-        return Result.Err<WorkspaceModel>(
-            WorkspaceChangeResultErrors.NO_WINDOW,
-        );
+        return Result.Err<WorkspaceModel>(ModelChangeErrors.TODO);
     }
 
     moveFocusedColumnLeft(): Result<WorkspaceModel> {
         const col = this.getFocusedColumn();
 
-        if (
-            col === undefined ||
-            this.focusedColumn === undefined ||
-            this.focusedColumn === 0
-        ) {
+        if (col === undefined || this.focusedColumn === undefined) {
             return Result.Err<WorkspaceModel>(
-                WorkspaceChangeResultErrors.NO_WINDOW,
+                ModelChangeErrors.NO_ACTION_TARGET,
+            );
+        }
+
+        if (this.focusedColumn === 0) {
+            return Result.Err<WorkspaceModel>(
+                ModelChangeErrors.NO_MOVEMENT_POSSIBLE,
             );
         }
 
@@ -421,13 +421,15 @@ class WorkspaceModel {
     moveFocusedColumnRight(): Result<WorkspaceModel> {
         const col = this.getFocusedColumn();
 
-        if (
-            col === undefined ||
-            this.focusedColumn === undefined ||
-            this.focusedColumn >= this.columns.length - 1
-        ) {
+        if (col === undefined || this.focusedColumn === undefined) {
             return Result.Err<WorkspaceModel>(
-                WorkspaceChangeResultErrors.NO_WINDOW,
+                ModelChangeErrors.NO_ACTION_TARGET,
+            );
+        }
+
+        if (this.focusedColumn >= this.columns.length - 1) {
+            return Result.Err<WorkspaceModel>(
+                ModelChangeErrors.NO_MOVEMENT_POSSIBLE,
             );
         }
 
@@ -451,13 +453,13 @@ class WorkspaceModel {
 
         if (currColumn === undefined || this.focusedColumn === undefined) {
             return Result.Err<WorkspaceModel>(
-                WorkspaceChangeResultErrors.NO_WINDOW,
+                ModelChangeErrors.NO_ACTION_TARGET,
             );
         }
 
         if (currColumn.focusedItem === 0) {
             return Result.Err<WorkspaceModel>(
-                WorkspaceChangeResultErrors.NO_WINDOW,
+                ModelChangeErrors.NO_MOVEMENT_POSSIBLE,
             );
         }
 
@@ -490,13 +492,13 @@ class WorkspaceModel {
 
         if (currColumn === undefined || this.focusedColumn === undefined) {
             return Result.Err<WorkspaceModel>(
-                WorkspaceChangeResultErrors.NO_WINDOW,
+                ModelChangeErrors.NO_ACTION_TARGET,
             );
         }
 
         if (currColumn.focusedItem >= currColumn.items.length - 1) {
             return Result.Err<WorkspaceModel>(
-                WorkspaceChangeResultErrors.NO_WINDOW,
+                ModelChangeErrors.NO_MOVEMENT_POSSIBLE,
             );
         }
 
@@ -524,13 +526,15 @@ class WorkspaceModel {
     moveFocusedItemLeft(): Result<WorkspaceModel> {
         const fromColumn = this.getFocusedColumn();
 
-        if (
-            this.focusedColumn === undefined ||
-            fromColumn === undefined ||
-            (this.focusedColumn === 0 && fromColumn.items.length === 1)
-        ) {
+        if (this.focusedColumn === undefined || fromColumn === undefined) {
             return Result.Err<WorkspaceModel>(
-                WorkspaceChangeResultErrors.NO_WINDOW,
+                ModelChangeErrors.NO_ACTION_TARGET,
+            );
+        }
+
+        if (this.focusedColumn === 0 && fromColumn.items.length === 1) {
+            return Result.Err<WorkspaceModel>(
+                ModelChangeErrors.NO_MOVEMENT_POSSIBLE,
             );
         }
 
@@ -587,14 +591,18 @@ class WorkspaceModel {
     moveFocusedItemRight(): Result<WorkspaceModel> {
         const fromColumn = this.getFocusedColumn();
 
+        if (this.focusedColumn === undefined || fromColumn === undefined) {
+            return Result.Err<WorkspaceModel>(
+                ModelChangeErrors.NO_ACTION_TARGET,
+            );
+        }
+
         if (
-            this.focusedColumn === undefined ||
-            fromColumn === undefined ||
-            (this.focusedColumn === this.columns.length - 1 &&
-                fromColumn.items.length === 1)
+            this.focusedColumn === this.columns.length - 1 &&
+            fromColumn.items.length === 1
         ) {
             return Result.Err<WorkspaceModel>(
-                WorkspaceChangeResultErrors.NO_WINDOW,
+                ModelChangeErrors.NO_MOVEMENT_POSSIBLE,
             );
         }
 
@@ -1370,4 +1378,8 @@ if (globalThis.process?.env.NODE_ENV === "test") {
     };
 }
 
-export { TestEnv, WorkspaceModel, WorkspaceChangeResultErrors };
+export {
+    TestEnv,
+    WorkspaceModel,
+    ModelChangeErrors as WorkspaceModelChangeErrors,
+};
