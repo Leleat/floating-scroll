@@ -2,7 +2,11 @@ import { GLib } from "../dependencies.js";
 import { Debug } from "../utils/debug.js";
 
 import { Timeouts } from "../utils/timeouts.js";
-import { type Event, EventGenerator, EventProcessor } from "./eventSystem.js";
+import {
+    type WorkspaceChangeEvent,
+    EventGenerator,
+    EventProcessor,
+} from "./eventSystem.js";
 import { WorkspaceModel } from "./workspaceModel.js";
 import { WorkspaceModelManager } from "./workspaceModelManager.js";
 
@@ -33,16 +37,17 @@ class WorkspaceView {
         this.eventProcessor = null!;
     }
 
-    private onEvent(event: Event) {
+    private onEvent(event: WorkspaceChangeEvent) {
         this.eventProcessor
             .processEvent(event)
-            .inspect((model) => {
-                WorkspaceModelManager.setActiveWorkspaceModel(model);
+            .inspect((event) => {
+                const model = event.getModel() as WorkspaceModel;
 
+                WorkspaceModelManager.setWorkspaceModel(model);
                 this.update(model);
             })
-            .inspectErr((e) => {
-                Debug.log(e);
+            .inspectErr((err) => {
+                Debug.log(err);
             });
     }
 

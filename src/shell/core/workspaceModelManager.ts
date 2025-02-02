@@ -1,4 +1,5 @@
 import { Meta } from "../dependencies.js";
+import { Debug } from "../utils/debug.js";
 
 import { WorkspaceModel } from "./workspaceModel.js";
 
@@ -14,16 +15,11 @@ function disable() {
 }
 
 class WorkspaceModelManager {
-    private model = new WorkspaceModel({
-        workspaceModelManager: this,
-        workArea: global.workspace_manager // TODO update on change
-            .get_active_workspace()
-            .get_work_area_for_monitor(0),
-    });
+    private model?: WorkspaceModel;
 
     destroy() {
-        this.model.destroy();
-        this.model = null!;
+        this.model?.destroy();
+        this.model = undefined;
     }
 
     getWindows() {
@@ -33,11 +29,28 @@ class WorkspaceModelManager {
         );
     }
 
-    getActiveWorkspaceModel() {
+    createWorkspaceModel(initialWindow: Meta.Window): WorkspaceModel {
+        Debug.assert(this.model === undefined, "A model already exists.");
+
+        return WorkspaceModel.build({
+            workspaceModelManager: this,
+            initialWindow,
+        });
+    }
+
+    removeWorkspaceModel() {
+        Debug.assert(this.model !== undefined, "No model to remove.");
+
+        this.model = undefined;
+    }
+
+    getWorkspaceModel() {
         return this.model;
     }
 
-    setActiveWorkspaceModel(model: WorkspaceModel) {
+    setWorkspaceModel(model: WorkspaceModel) {
+        Debug.assert(this.model !== model, "Model is already set.");
+
         this.model = model;
     }
 }

@@ -7,8 +7,9 @@ import { WorkspaceModel } from "./workspaceModel.js";
 import { WorkspaceModelManager } from "./workspaceModelManager.js";
 
 class EventGenerator {
-    private subs: Map<object, ((e: Event) => void)[]> = new Map();
-    private queue: Event[] = [];
+    private subs: Map<object, ((e: WorkspaceChangeEvent) => void)[]> =
+        new Map();
+    private queue: WorkspaceChangeEvent[] = [];
     private queueIsProcessing = false;
 
     constructor() {
@@ -105,7 +106,7 @@ class EventGenerator {
         this.subs.clear();
     }
 
-    sub(subscriber: object, callback: (event: Event) => void) {
+    sub(subscriber: object, callback: (event: WorkspaceChangeEvent) => void) {
         if (this.subs.has(subscriber)) {
             this.subs.get(subscriber)!.push(callback);
         } else {
@@ -131,7 +132,7 @@ class EventGenerator {
         });
     }
 
-    private generateEvent(event: Event) {
+    private generateEvent(event: WorkspaceChangeEvent) {
         this.queue.push(event);
 
         if (this.queueIsProcessing) {
@@ -212,13 +213,13 @@ class EventGenerator {
 }
 
 class EventProcessor {
-    private records: Event[] = [];
+    private records: WorkspaceChangeEvent[] = [];
 
     destroy() {
-        this.records = [];
+        this.records = null!;
     }
 
-    processEvent(event: Event) {
+    processEvent(event: WorkspaceChangeEvent) {
         if (this.records.length > 10) {
             this.flushRecords();
         }
@@ -233,154 +234,367 @@ class EventProcessor {
     }
 }
 
-interface Event {
+interface WorkspaceChangeEvent {
     type: string;
-    process(): Result<WorkspaceModel>;
+
+    /**
+     * Ok -> there is a new workspace model
+     * Err -> there is no new workspace model
+     */
+    process(): Result<WorkspaceChangeEvent>;
+
+    /**
+     * @returns The new workspace model, if the event processing result is Ok.
+     */
+    getModel(): WorkspaceModel | undefined;
 }
 
-class WindowOpenedEvent implements Event {
-    type = "WindowOpenedEvent";
+abstract class WorkspaceModelModificationEvent implements WorkspaceChangeEvent {
+    readonly type: string;
 
+    protected model?: WorkspaceModel;
+
+    constructor({ type }: { type: string }) {
+        this.type = type;
+    }
+
+    abstract process(): Result<WorkspaceChangeEvent>;
+
+    getModel(): WorkspaceModel | undefined {
+        return this.model;
+    }
+}
+
+abstract class FocusChangeEvent implements WorkspaceChangeEvent {
+    readonly type: string;
+    protected model: undefined;
+
+    constructor({ type }: { type: string }) {
+        this.type = type;
+    }
+
+    // never "Ok" since we only change focus and rely on the focus
+    // change event to actually modify the workspaceModel.
+    abstract process(): Result<WorkspaceChangeEvent>;
+
+    getModel() {
+        return undefined;
+    }
+}
+
+class WindowOpenedEvent extends WorkspaceModelModificationEvent {
     private readonly window: Meta.Window;
 
     constructor({ window }: { window: Meta.Window }) {
+        super({ type: "WindowOpenedEvent" });
         this.window = window;
     }
 
     process() {
-        return WorkspaceModelManager.getActiveWorkspaceModel().insertWindow(
-            this.window,
-        );
+        const workspaceModel = WorkspaceModelManager.getWorkspaceModel();
+
+        if (workspaceModel) {
+            this.model = workspaceModel.insertWindow(this.window).unwrap();
+        } else {
+            this.model = WorkspaceModelManager.createWorkspaceModel(
+                this.window,
+            );
+        }
+
+        return Result.Ok<WorkspaceChangeEvent>(this);
     }
 }
 
-class WindowClosedEvent implements Event {
-    type = "WindowClosedEvent";
-
+class WindowClosedEvent extends WorkspaceModelModificationEvent {
     private readonly window: Meta.Window;
 
     constructor({ window }: { window: Meta.Window }) {
+        super({ type: "WindowClosedEvent" });
         this.window = window;
     }
 
     process() {
-        return WorkspaceModelManager.getActiveWorkspaceModel().removeWindow(
-            this.window,
-            global.display.focus_window,
-        );
+        const newModel =
+            WorkspaceModelManager.getWorkspaceModel()!.removeWindow(
+                this.window,
+                global.display.focus_window,
+            );
+
+        return newModel.match({
+            ok: (m) => {
+                this.model = m;
+                return Result.Ok<WorkspaceChangeEvent>(this);
+            },
+            error: (e) => Result.Err<WorkspaceChangeEvent>(e),
+        });
     }
 }
 
-class WindowFocusedEvent implements Event {
-    type = "WindowFocusedEvent";
-
+class WindowFocusedEvent extends WorkspaceModelModificationEvent {
     private readonly window: Meta.Window;
 
     constructor({ window }: { window: Meta.Window }) {
+        super({ type: "WindowFocusedEvent" });
         this.window = window;
     }
 
     process() {
-        return WorkspaceModelManager.getActiveWorkspaceModel().relayout(
-            this.window,
-        );
+        this.model = WorkspaceModelManager.getWorkspaceModel()!
+            .relayout(this.window)
+            .unwrap();
+
+        return Result.Ok<WorkspaceChangeEvent>(this);
     }
 }
 
-class MoveFocusLeftShortcutEvent implements Event {
-    type = "MoveFocusLeftShortcutEvent";
+class MoveFocusLeftShortcutEvent extends FocusChangeEvent {
+    constructor() {
+        super({ type: "MoveFocusLeftShortcutEvent" });
+    }
 
     process() {
-        return WorkspaceModelManager.getActiveWorkspaceModel().focusItemOnLeft();
+        const model = WorkspaceModelManager.getWorkspaceModel();
+
+        if (model) {
+            return model.focusItemOnLeft().match({
+                ok: () => Result.Ok<WorkspaceChangeEvent>(this),
+                error: (e) => Result.Err<WorkspaceChangeEvent>(e),
+            });
+        } else {
+            return Result.Err<WorkspaceChangeEvent>(
+                "No active workspace model",
+            );
+        }
     }
 }
 
-class MoveFocusRightShortcutEvent implements Event {
-    type = "MoveFocusRightShortcutEvent";
+class MoveFocusRightShortcutEvent extends FocusChangeEvent {
+    constructor() {
+        super({ type: "MoveFocusRightShortcutEvent" });
+    }
 
     process() {
-        return WorkspaceModelManager.getActiveWorkspaceModel().focusItemOnRight();
+        const model = WorkspaceModelManager.getWorkspaceModel();
+
+        if (model) {
+            return model.focusItemOnRight().match({
+                ok: () => Result.Ok<WorkspaceChangeEvent>(this),
+                error: (e) => Result.Err<WorkspaceChangeEvent>(e),
+            });
+        } else {
+            return Result.Err<WorkspaceChangeEvent>(
+                "No active workspace model",
+            );
+        }
     }
 }
 
-class MoveFocusUpShortcutEvent implements Event {
-    type = "MoveFocusUpShortcutEvent";
+class MoveFocusUpShortcutEvent extends FocusChangeEvent {
+    constructor() {
+        super({ type: "MoveFocusUpShortcutEvent" });
+    }
 
     process() {
-        return WorkspaceModelManager.getActiveWorkspaceModel().focusItemAbove();
+        const model = WorkspaceModelManager.getWorkspaceModel();
+
+        if (model) {
+            return model.focusItemAbove().match({
+                ok: () => Result.Ok<WorkspaceChangeEvent>(this),
+                error: (e) => Result.Err<WorkspaceChangeEvent>(e),
+            });
+        } else {
+            return Result.Err<WorkspaceChangeEvent>(
+                "No active workspace model",
+            );
+        }
     }
 }
 
-class MoveFocusDownShortcutEvent implements Event {
-    type = "MoveFocusDownShortcutEvent";
+class MoveFocusDownShortcutEvent extends FocusChangeEvent {
+    constructor() {
+        super({ type: "MoveFocusDownShortcutEvent" });
+    }
 
     process() {
-        return WorkspaceModelManager.getActiveWorkspaceModel().focusItemBelow();
+        const model = WorkspaceModelManager.getWorkspaceModel();
+
+        if (model) {
+            return model.focusItemBelow().match({
+                ok: () => Result.Ok<WorkspaceChangeEvent>(this),
+                error: (e) => Result.Err<WorkspaceChangeEvent>(e),
+            });
+        } else {
+            return Result.Err<WorkspaceChangeEvent>(
+                "No active workspace model",
+            );
+        }
     }
 }
 
-class MoveColumnUpShortcutEvent implements Event {
-    type = "MoveColumnUpShortcutEvent";
-
-    process(): Result<WorkspaceModel> {
-        return WorkspaceModelManager.getActiveWorkspaceModel().moveFocusedColumnUp();
+class MoveColumnUpShortcutEvent extends WorkspaceModelModificationEvent {
+    constructor() {
+        super({ type: "MoveColumnUpShortcutEvent" });
     }
-}
-
-class MoveColumnDownShortcutEvent implements Event {
-    type = "MoveColumnDownShortcutEvent";
-
-    process(): Result<WorkspaceModel> {
-        return WorkspaceModelManager.getActiveWorkspaceModel().moveFocusedColumnDown();
-    }
-}
-
-class MoveColumnLeftShortcutEvent implements Event {
-    type = "MoveColumnLeftShortcutEvent";
 
     process() {
-        return WorkspaceModelManager.getActiveWorkspaceModel().moveFocusedColumnLeft();
+        // TODO
+        return Result.Err<WorkspaceChangeEvent>("No active workspace model");
     }
 }
 
-class MoveColumnRightShortcutEvent implements Event {
-    type = "MoveColumnRightShortcutEvent";
+class MoveColumnDownShortcutEvent extends WorkspaceModelModificationEvent {
+    constructor() {
+        super({ type: "MoveColumnDownShortcutEvent" });
+    }
 
     process() {
-        return WorkspaceModelManager.getActiveWorkspaceModel().moveFocusedColumnRight();
+        // TODO
+        return Result.Err<WorkspaceChangeEvent>("No active workspace model");
     }
 }
 
-class MoveItemUpShortcutEvent implements Event {
-    type = "MoveItemUpShortcutEvent";
+class MoveColumnLeftShortcutEvent extends WorkspaceModelModificationEvent {
+    constructor() {
+        super({ type: "MoveColumnLeftShortcutEvent" });
+    }
 
     process() {
-        return WorkspaceModelManager.getActiveWorkspaceModel().moveFocusedItemUp();
+        const model = WorkspaceModelManager.getWorkspaceModel();
+
+        if (model) {
+            return model.moveFocusedColumnLeft().match({
+                ok: (m) => {
+                    this.model = m;
+                    return Result.Ok<WorkspaceChangeEvent>(this);
+                },
+                error: (e) => Result.Err<WorkspaceChangeEvent>(e),
+            });
+        } else {
+            return Result.Err<WorkspaceChangeEvent>(
+                "No active workspace model",
+            );
+        }
     }
 }
 
-class MoveItemDownShortcutEvent implements Event {
-    type = "MoveItemDownShortcutEvent";
+class MoveColumnRightShortcutEvent extends WorkspaceModelModificationEvent {
+    constructor() {
+        super({ type: "MoveColumnRightShortcutEvent" });
+    }
 
     process() {
-        return WorkspaceModelManager.getActiveWorkspaceModel().moveFocusedItemDown();
+        const model = WorkspaceModelManager.getWorkspaceModel();
+
+        if (model) {
+            return model.moveFocusedColumnRight().match({
+                ok: (m) => {
+                    this.model = m;
+                    return Result.Ok<WorkspaceChangeEvent>(this);
+                },
+                error: (e) => Result.Err<WorkspaceChangeEvent>(e),
+            });
+        } else {
+            return Result.Err<WorkspaceChangeEvent>(
+                "No active workspace model",
+            );
+        }
     }
 }
 
-class MoveItemLeftShortcutEvent implements Event {
-    type = "MoveItemLeftShortcutEvent";
+class MoveItemUpShortcutEvent extends WorkspaceModelModificationEvent {
+    constructor() {
+        super({ type: "MoveItemUpShortcutEvent" });
+    }
 
     process() {
-        return WorkspaceModelManager.getActiveWorkspaceModel().moveFocusedItemLeft();
+        const model = WorkspaceModelManager.getWorkspaceModel();
+
+        if (model) {
+            return model.moveFocusedItemUp().match({
+                ok: (m) => {
+                    this.model = m;
+                    return Result.Ok<WorkspaceChangeEvent>(this);
+                },
+                error: (e) => Result.Err<WorkspaceChangeEvent>(e),
+            });
+        } else {
+            return Result.Err<WorkspaceChangeEvent>(
+                "No active workspace model",
+            );
+        }
     }
 }
 
-class MoveItemRightShortcutEvent implements Event {
-    type = "MoveItemRightShortcutEvent";
+class MoveItemDownShortcutEvent extends WorkspaceModelModificationEvent {
+    constructor() {
+        super({ type: "MoveItemDownShortcutEvent" });
+    }
 
     process() {
-        return WorkspaceModelManager.getActiveWorkspaceModel().moveFocusedItemRight();
+        const model = WorkspaceModelManager.getWorkspaceModel();
+
+        if (model) {
+            return model.moveFocusedItemDown().match({
+                ok: (m) => {
+                    this.model = m;
+                    return Result.Ok<WorkspaceChangeEvent>(this);
+                },
+                error: (e) => Result.Err<WorkspaceChangeEvent>(e),
+            });
+        } else {
+            return Result.Err<WorkspaceChangeEvent>(
+                "No active workspace model",
+            );
+        }
     }
 }
 
-export { type Event, EventGenerator, EventProcessor };
+class MoveItemLeftShortcutEvent extends WorkspaceModelModificationEvent {
+    constructor() {
+        super({ type: "MoveItemLeftShortcutEvent" });
+    }
+
+    process() {
+        const model = WorkspaceModelManager.getWorkspaceModel();
+
+        if (model) {
+            return model.moveFocusedItemLeft().match({
+                ok: (m) => {
+                    this.model = m;
+                    return Result.Ok<WorkspaceChangeEvent>(this);
+                },
+                error: (e) => Result.Err<WorkspaceChangeEvent>(e),
+            });
+        } else {
+            return Result.Err<WorkspaceChangeEvent>(
+                "No active workspace model",
+            );
+        }
+    }
+}
+
+class MoveItemRightShortcutEvent extends WorkspaceModelModificationEvent {
+    constructor() {
+        super({ type: "MoveItemRightShortcutEvent" });
+    }
+
+    process() {
+        const model = WorkspaceModelManager.getWorkspaceModel();
+
+        if (model) {
+            return model.moveFocusedItemRight().match({
+                ok: (m) => {
+                    this.model = m;
+                    return Result.Ok<WorkspaceChangeEvent>(this);
+                },
+                error: (e) => Result.Err<WorkspaceChangeEvent>(e),
+            });
+        } else {
+            return Result.Err<WorkspaceChangeEvent>(
+                "No active workspace model",
+            );
+        }
+    }
+}
+
+export { type WorkspaceChangeEvent, EventGenerator, EventProcessor };

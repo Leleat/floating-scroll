@@ -10,9 +10,18 @@ import { Debug } from "../utils/debug.js";
 import { Settings } from "../utils/settings.js";
 import { type WorkspaceModelManager } from "./workspaceModelManager.js";
 
+// This type does not guarantee the non-emptiness via the type system. This is
+// just a helper to make the type more descriptive. The guarantee should happen
+// at runtime via JS when initializing and when removing items. There does not
+// appear to be a way to encode non-empty arrays well in TypeScript. See https://stackoverflow.com/questions/56006111/is-it-possible-to-define-a-non-empty-array-type-in-typescript
+type NonEmptyArray<T> = Array<T> & {
+    [key: number]: T;
+};
+
 const ModelChangeErrors = Object.freeze({
-    NO_ACTION_TARGET: "No target to act on found",
+    EMPTY_MODEL: "Destroying workspace model",
     NO_FOCUS_TARGET: "No target to focus on found",
+    NO_ACTION_TARGET: "No target to act on found",
     NO_MOVEMENT_POSSIBLE:
         "No movement possible because item/col is already at the edge",
     ONLY_FOCUS_CHANGE:
@@ -27,18 +36,7 @@ class Item {
     public readonly rect!: Rect;
     private padding!: number;
 
-    constructor({
-        value,
-        rect = {
-            x: 0,
-            y: 0,
-            width: 0,
-            height: 0,
-        },
-    }: {
-        value: Meta.Window;
-        rect?: Rect;
-    }) {
+    constructor({ value, rect }: { value: Meta.Window; rect: Rect }) {
         Debug.assert(
             value !== undefined,
             "Value must be defined (eg a Window).",
@@ -120,16 +118,17 @@ class Item {
 
 class Column {
     readonly focusedItem: number = 0;
-    readonly items: Item[] = [];
+    readonly items: NonEmptyArray<Item> = [];
     readonly rect: Rect;
 
     constructor({
-        items = [],
+        items,
         focusedItem = 0,
     }: {
-        items?: Item[];
+        items: NonEmptyArray<Item>;
         focusedItem?: number;
-    } = {}) {
+    }) {
+        Debug.assert(items.length > 0, "Items must be non-empty.");
         Debug.assert(
             focusedItem >= 0 && focusedItem < items.length,
             `focus must be a valid index: ${focusedItem}`,
@@ -210,34 +209,54 @@ class WorkspaceGrid {
 }
 
 class WorkspaceModel {
-    readonly columns: Column[];
-    readonly focusedColumn: number | undefined;
-    readonly workArea: Rect;
-    readonly workspaceModelManager: typeof WorkspaceModelManager;
+    static build({
+        workspaceModelManager,
+        initialWindow,
+    }: {
+        workspaceModelManager: typeof WorkspaceModelManager;
+        initialWindow: Meta.Window;
+    }): WorkspaceModel {
+        const frameRect = initialWindow.get_frame_rect();
+        const item = new Item({
+            value: initialWindow,
+            rect: {
+                x: 0,
+                y: 0,
+                width: frameRect.width,
+                height: frameRect.height,
+            },
+        });
+        const unplacedModel = new WorkspaceModel({
+            workspaceModelManager,
+            columns: [new Column({ items: [item] })],
+            focusedColumn: 0,
+            workArea: initialWindow.get_work_area_current_monitor(),
+        });
+
+        return unplacedModel.relayout(initialWindow).unwrap();
+    }
+
+    private readonly columns: NonEmptyArray<Column>;
+    private readonly focusedColumn: number;
+    private readonly workArea: Rect;
+    private readonly workspaceModelManager: typeof WorkspaceModelManager;
 
     constructor({
         workspaceModelManager,
-        columns = [],
+        columns,
         focusedColumn,
         workArea,
     }: {
         workspaceModelManager: typeof WorkspaceModelManager;
-        columns?: Column[];
-        focusedColumn?: number;
+        columns: NonEmptyArray<Column>;
+        focusedColumn: number;
         workArea: Rect;
     }) {
         Debug.assert(
             Array.isArray(columns) &&
+                columns.length > 0 &&
                 columns.every((col) => col instanceof Column),
-            `columns must be an array of columns: ${columns}`,
-        );
-
-        Debug.assert(
-            focusedColumn === undefined ||
-                (Number.isInteger(focusedColumn) &&
-                    focusedColumn >= 0 &&
-                    focusedColumn < columns.length),
-            `focus must be a valid index: ${focusedColumn}`,
+            `columns must be a non-empty array of columns. Current value is: ${columns}`,
         );
 
         this.workspaceModelManager = workspaceModelManager;
@@ -248,6 +267,19 @@ class WorkspaceModel {
 
     destroy() {
         this.columns.forEach((col) => col.destroy());
+        // @ts-expect-error null out
+        this.columns.length = null;
+
+        Debug.assert(
+            this === this.workspaceModelManager.getWorkspaceModel(),
+            "WorkspaceModelManager does not have 'this' as the current model",
+        );
+        this.workspaceModelManager.removeWorkspaceModel();
+        // @ts-expect-error null out
+        this.workspaceModelManager = null;
+
+        // @ts-expect-error null out
+        this.workArea = null;
     }
 
     clone({
@@ -255,6 +287,11 @@ class WorkspaceModel {
         columns = this.columns.map((col) => col.clone()),
         workArea = this.workArea,
         workspaceModelManager = this.workspaceModelManager,
+    }: {
+        focusedColumn?: number;
+        columns?: NonEmptyArray<Column>;
+        workArea?: Rect;
+        workspaceModelManager?: typeof WorkspaceModelManager;
     } = {}) {
         return new WorkspaceModel({
             workspaceModelManager,
@@ -273,25 +310,7 @@ class WorkspaceModel {
         });
     }
 
-    /**
-     * @param window may be null if there is no focused window, undefined if
-     *      we relayout without a focus change
-     */
-    relayout(window: Meta.Window | null | undefined): Result<WorkspaceModel> {
-        if (window === null || window === undefined) {
-            Debug.assert(
-                this.columns.length === 0,
-                "Workspace isn't empty. Missing window to focus on.",
-            );
-
-            return Result.Ok<WorkspaceModel>(
-                new WorkspaceModel({
-                    workArea: this.workArea,
-                    workspaceModelManager: this.workspaceModelManager,
-                }),
-            );
-        }
-
+    relayout(window: Meta.Window): Result<WorkspaceModel> {
         const { focusedColumn: newFocusedColumn, focusedItem: newFocusItem } =
             this.findFocusedIndices(window);
 
@@ -329,7 +348,7 @@ class WorkspaceModel {
     }
 
     focusItemOnLeft() {
-        if (this.focusedColumn === undefined || this.focusedColumn === 0) {
+        if (this.focusedColumn === 0) {
             return Result.Err<WorkspaceModel>(
                 ModelChangeErrors.NO_ACTION_TARGET,
             );
@@ -343,10 +362,7 @@ class WorkspaceModel {
     }
 
     focusItemOnRight() {
-        if (
-            this.focusedColumn === undefined ||
-            this.focusedColumn === this.columns.length - 1
-        ) {
+        if (this.focusedColumn === this.columns.length - 1) {
             return Result.Err<WorkspaceModel>(
                 ModelChangeErrors.NO_ACTION_TARGET,
             );
@@ -360,9 +376,9 @@ class WorkspaceModel {
     }
 
     focusItemAbove() {
-        const currColumn = this.getFocusedColumn();
+        const currColumn = this.columns[this.focusedColumn];
 
-        if (currColumn === undefined || currColumn.focusedItem === 0) {
+        if (currColumn.focusedItem === 0) {
             return Result.Err<WorkspaceModel>(
                 ModelChangeErrors.NO_ACTION_TARGET,
             );
@@ -376,12 +392,9 @@ class WorkspaceModel {
     }
 
     focusItemBelow() {
-        const currColumn = this.getFocusedColumn();
+        const currColumn = this.columns[this.focusedColumn];
 
-        if (
-            currColumn === undefined ||
-            currColumn.focusedItem >= currColumn.items.length - 1
-        ) {
+        if (currColumn.focusedItem >= currColumn.items.length - 1) {
             return Result.Err<WorkspaceModel>(
                 ModelChangeErrors.NO_ACTION_TARGET,
             );
@@ -405,13 +418,7 @@ class WorkspaceModel {
     }
 
     moveFocusedColumnLeft(): Result<WorkspaceModel> {
-        const col = this.getFocusedColumn();
-
-        if (col === undefined || this.focusedColumn === undefined) {
-            return Result.Err<WorkspaceModel>(
-                ModelChangeErrors.NO_ACTION_TARGET,
-            );
-        }
+        const col = this.columns[this.focusedColumn];
 
         if (this.focusedColumn === 0) {
             return Result.Err<WorkspaceModel>(
@@ -423,6 +430,7 @@ class WorkspaceModel {
         const model = new WorkspaceModel({
             workspaceModelManager: this.workspaceModelManager,
             workArea: this.workArea,
+            focusedColumn: this.focusedColumn - 1,
             columns: [
                 ...this.columns.slice(0, this.focusedColumn - 1),
                 this.columns[this.focusedColumn],
@@ -435,13 +443,7 @@ class WorkspaceModel {
     }
 
     moveFocusedColumnRight(): Result<WorkspaceModel> {
-        const col = this.getFocusedColumn();
-
-        if (col === undefined || this.focusedColumn === undefined) {
-            return Result.Err<WorkspaceModel>(
-                ModelChangeErrors.NO_ACTION_TARGET,
-            );
-        }
+        const col = this.columns[this.focusedColumn];
 
         if (this.focusedColumn >= this.columns.length - 1) {
             return Result.Err<WorkspaceModel>(
@@ -453,6 +455,7 @@ class WorkspaceModel {
         const model = new WorkspaceModel({
             workspaceModelManager: this.workspaceModelManager,
             workArea: this.workArea,
+            focusedColumn: this.focusedColumn + 1,
             columns: [
                 ...this.columns.slice(0, this.focusedColumn),
                 this.columns[this.focusedColumn + 1],
@@ -465,13 +468,7 @@ class WorkspaceModel {
     }
 
     moveFocusedItemUp(): Result<WorkspaceModel> {
-        const currColumn = this.getFocusedColumn();
-
-        if (currColumn === undefined || this.focusedColumn === undefined) {
-            return Result.Err<WorkspaceModel>(
-                ModelChangeErrors.NO_ACTION_TARGET,
-            );
-        }
+        const currColumn = this.columns[this.focusedColumn];
 
         if (currColumn.focusedItem === 0) {
             return Result.Err<WorkspaceModel>(
@@ -504,13 +501,7 @@ class WorkspaceModel {
     }
 
     moveFocusedItemDown(): Result<WorkspaceModel> {
-        const currColumn = this.getFocusedColumn();
-
-        if (currColumn === undefined || this.focusedColumn === undefined) {
-            return Result.Err<WorkspaceModel>(
-                ModelChangeErrors.NO_ACTION_TARGET,
-            );
-        }
+        const currColumn = this.columns[this.focusedColumn];
 
         if (currColumn.focusedItem >= currColumn.items.length - 1) {
             return Result.Err<WorkspaceModel>(
@@ -540,13 +531,7 @@ class WorkspaceModel {
     }
 
     moveFocusedItemLeft(): Result<WorkspaceModel> {
-        const fromColumn = this.getFocusedColumn();
-
-        if (this.focusedColumn === undefined || fromColumn === undefined) {
-            return Result.Err<WorkspaceModel>(
-                ModelChangeErrors.NO_ACTION_TARGET,
-            );
-        }
+        const fromColumn = this.columns[this.focusedColumn];
 
         if (this.focusedColumn === 0 && fromColumn.items.length === 1) {
             return Result.Err<WorkspaceModel>(
@@ -605,13 +590,7 @@ class WorkspaceModel {
     }
 
     moveFocusedItemRight(): Result<WorkspaceModel> {
-        const fromColumn = this.getFocusedColumn();
-
-        if (this.focusedColumn === undefined || fromColumn === undefined) {
-            return Result.Err<WorkspaceModel>(
-                ModelChangeErrors.NO_ACTION_TARGET,
-            );
-        }
+        const fromColumn = this.columns[this.focusedColumn];
 
         if (
             this.focusedColumn === this.columns.length - 1 &&
@@ -721,19 +700,24 @@ class WorkspaceModel {
         return new WorkspaceModel({
             workspaceModelManager: this.workspaceModelManager,
             workArea: this.workArea,
+            focusedColumn: -1, // will be set via relayout
             columns: cols,
         }).relayout(window);
     }
 
     removeWindow(
         window: Meta.Window,
-        newFocus: Meta.Window | undefined,
+        newFocus: Meta.Window | null,
     ): Result<WorkspaceModel> {
-        const noNewFocus = newFocus === undefined || newFocus === null;
+        if (this.columns.length === 1 && this.columns[0].items.length === 1) {
+            this.destroy();
+
+            return Result.Err<WorkspaceModel>(ModelChangeErrors.EMPTY_MODEL);
+        }
 
         Debug.assert(
-            !!newFocus || (noNewFocus && this.columns.length === 1),
-            "Missing window to focus on after removal",
+            newFocus !== null,
+            "Missing new window to relayout around after removal",
         );
 
         const column = this.columns.find((column) => column.contains(window));
@@ -747,6 +731,7 @@ class WorkspaceModel {
             return new WorkspaceModel({
                 workspaceModelManager: this.workspaceModelManager,
                 workArea: this.workArea,
+                focusedColumn: -1, // will be set via relayout
                 columns: this.columns.filter((col) => col !== column),
             }).relayout(newFocus);
         }
@@ -766,6 +751,7 @@ class WorkspaceModel {
         return new WorkspaceModel({
             workspaceModelManager: this.workspaceModelManager,
             workArea: this.workArea,
+            focusedColumn: -1, // will be set via relayout
             columns: this.columns.with(this.columns.indexOf(column), newColumn),
         }).relayout(newFocus);
     }
@@ -792,24 +778,18 @@ class WorkspaceModel {
         return indices;
     }
 
-    private getFocusedColumn() {
-        return this.focusedColumn === undefined ?
-                undefined
-            :   this.columns[this.focusedColumn];
-    }
-
-    private calculateTotalWidth(columns: Column[]) {
+    private calculateTotalWidth(columns: NonEmptyArray<Column>) {
         return columns.reduce((acc, col) => acc + col.rect.width, 0);
     }
 
-    private calculateTotalHeight(items: Item[]) {
+    private calculateTotalHeight(items: NonEmptyArray<Item>) {
         return items.reduce((acc, item) => acc + item.rect.height, 0);
     }
 
     private alignColumns(
         index: number,
-        columns: Column[],
-        resultCols: Column[],
+        columns: NonEmptyArray<Column>,
+        resultCols: NonEmptyArray<Column>,
     ) {
         Debug.assert(
             columns[index].equals(resultCols[0]),
@@ -858,8 +838,8 @@ class WorkspaceModel {
 
     private alignItems(
         newFocusIndex: number,
-        items: Item[],
-        resultItems: Item[],
+        items: NonEmptyArray<Item>,
+        resultItems: NonEmptyArray<Item>,
     ) {
         Debug.assert(
             items[newFocusIndex].equals(resultItems[0]),
@@ -898,7 +878,7 @@ class WorkspaceModel {
 
     private calculatePlacementOnMainAxis(
         newFocusColumn: number,
-        columns: Column[],
+        columns: NonEmptyArray<Column>,
         workspace: Rect,
     ) {
         const focusBehaviorMainAxis = Settings.getFocusBehaviorMainAxis();
@@ -920,7 +900,7 @@ class WorkspaceModel {
 
     private calculatePlacementOnCrossAxis(
         newFocusItem: number,
-        items: Item[],
+        items: NonEmptyArray<Item>,
         workspace: Rect,
     ) {
         const focusBehaviorCrossAxis = Settings.getFocusBehaviorCrossAxis();
@@ -938,7 +918,7 @@ class WorkspaceModel {
 
     private centerOnMainAxis(
         newFocusIndex: number,
-        columns: Column[],
+        columns: NonEmptyArray<Column>,
         workspace: Rect,
     ) {
         const selectedCol = columns[newFocusIndex];
@@ -962,7 +942,7 @@ class WorkspaceModel {
 
     private centerOnCrossAxis(
         newFocusIndex: number,
-        items: Item[],
+        items: NonEmptyArray<Item>,
         workspace: Rect,
     ) {
         const selectedItem = items[newFocusIndex];
@@ -981,7 +961,7 @@ class WorkspaceModel {
 
     private lazyFollowOnMainAxis(
         newFocusColumn: number,
-        columns: Column[],
+        columns: NonEmptyArray<Column>,
         workspace: Rect,
     ) {
         const mrus = this.workspaceModelManager.getWindows();
@@ -1065,7 +1045,10 @@ class WorkspaceModel {
         }
     }
 
-    private centerAllColumnsOnMainAxis(columns: Column[], workspace: Rect) {
+    private centerAllColumnsOnMainAxis(
+        columns: NonEmptyArray<Column>,
+        workspace: Rect,
+    ) {
         const totalWidth = this.calculateTotalWidth(columns);
         const [firstCol] = columns;
         const placedFirstCol = new Column({
@@ -1084,7 +1067,7 @@ class WorkspaceModel {
 
     private alignToLeftMostColForLazyFollowOnMainAxis(
         leftMostFullyVisColumn: Column,
-        columns: Column[],
+        columns: NonEmptyArray<Column>,
     ) {
         const leftMostIndex = columns.indexOf(leftMostFullyVisColumn);
         const windowsOffscreenOnLeft = leftMostIndex > 0;
@@ -1109,7 +1092,7 @@ class WorkspaceModel {
 
     private alignToRightMostColForLazyFollowOnMainAxis(
         rightMostFullyVisColumn: Column,
-        columns: Column[],
+        columns: NonEmptyArray<Column>,
         workspace: Rect,
     ) {
         const rightMostIndex = columns.indexOf(rightMostFullyVisColumn);
@@ -1135,7 +1118,7 @@ class WorkspaceModel {
 
     private lazyFollowOnCrossAxis(
         newFocusItem: number,
-        items: Item[],
+        items: NonEmptyArray<Item>,
         workspace: Rect,
     ) {
         const mrus = this.workspaceModelManager.getWindows();
@@ -1217,7 +1200,7 @@ class WorkspaceModel {
 
     private alignToTopMostItemForLazyFollowOnCrossAxis(
         topMostItem: Item,
-        items: Item[],
+        items: NonEmptyArray<Item>,
     ) {
         const topMostIndex = items.indexOf(topMostItem);
         const placedItem = topMostItem.clone({ rect: { y: 0 } });
@@ -1227,7 +1210,7 @@ class WorkspaceModel {
 
     private alignToBottomMostItemForLazyFollowOnCrossAxis(
         bottomMostItem: Item,
-        items: Item[],
+        items: NonEmptyArray<Item>,
         workspace: Rect,
     ) {
         const bottomMostIndex = items.indexOf(bottomMostItem);
@@ -1238,7 +1221,10 @@ class WorkspaceModel {
         return this.alignItems(bottomMostIndex, items, [placedItem]);
     }
 
-    private centerAllItemsOnCrossAxis(items: Item[], workspace: Rect) {
+    private centerAllItemsOnCrossAxis(
+        items: NonEmptyArray<Item>,
+        workspace: Rect,
+    ) {
         const totalHeight = this.calculateTotalHeight(items);
         const [firstItem] = items;
         const placedFirstItem = firstItem.clone({
@@ -1251,8 +1237,8 @@ class WorkspaceModel {
     private insertWindowOnLeftOfFocus(
         window: Meta.Window,
         mrus: Meta.Window[],
-        columns: Column[],
-        focusedColumn: number | undefined,
+        columns: NonEmptyArray<Column>,
+        focusedColumn: number,
         workspace: Rect,
     ) {
         const windowFrame = window.get_frame_rect();
@@ -1277,10 +1263,6 @@ class WorkspaceModel {
             ],
         });
 
-        if (focusedColumn === undefined) {
-            return [newColumn];
-        }
-
         return [
             ...columns.slice(0, focusedColumn),
             newColumn,
@@ -1291,8 +1273,8 @@ class WorkspaceModel {
     private insertWindowOnRightOfFocus(
         window: Meta.Window,
         mrus: Meta.Window[],
-        columns: Column[],
-        focusedColumn: number | undefined,
+        columns: NonEmptyArray<Column>,
+        focusedColumn: number,
         workspace: Rect,
     ) {
         const windowFrame = window.get_frame_rect();
@@ -1317,10 +1299,6 @@ class WorkspaceModel {
             ],
         });
 
-        if (focusedColumn === undefined) {
-            return [newColumn];
-        }
-
         return [
             ...columns.slice(0, focusedColumn + 1),
             newColumn,
@@ -1331,16 +1309,13 @@ class WorkspaceModel {
     private insertWindowBetweenMrus(
         window: Meta.Window,
         mrus: Meta.Window[],
-        columns: Column[],
-        focusedColumn: number | undefined,
+        columns: NonEmptyArray<Column>,
+        focusedColumn: number,
         workspace: Rect,
     ) {
         const [prevFocusedWindow, prevPrevFocusedWindow] = mrus;
 
-        if (
-            prevFocusedWindow === undefined ||
-            prevPrevFocusedWindow === undefined
-        ) {
+        if (prevPrevFocusedWindow === undefined) {
             return this.insertWindowOnLeftOfFocus(
                 window,
                 mrus,
