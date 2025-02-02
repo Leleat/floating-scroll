@@ -108,7 +108,7 @@
         </key>
 
         <key name="debug-level" enum="org.gnome.shell.extensions.floating-scroll.debug-level">
-            <default>'error'</default>
+            <default>'debug'</default>
             <summary>Private key: Determines the debug level</summary>
         </key>
 
