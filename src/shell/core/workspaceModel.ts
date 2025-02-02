@@ -11,11 +11,12 @@ import { Settings } from "../utils/settings.js";
 import { type WorkspaceModelManager } from "./workspaceModelManager.js";
 
 const ModelChangeErrors = Object.freeze({
-    TODO: "TODO",
     NO_ACTION_TARGET: "No target to act on found",
     NO_FOCUS_TARGET: "No target to focus on found",
     NO_MOVEMENT_POSSIBLE:
         "No movement possible because item/col is already at the edge",
+    ONLY_FOCUS_CHANGE:
+        "Only focus change, which should be ignored, because a relayout will follow",
 });
 
 type ModelChangeErrors =
@@ -327,65 +328,80 @@ class WorkspaceModel {
         );
     }
 
-    getItemOnLeftOfFocus() {
+    focusItemOnLeft() {
         if (this.focusedColumn === undefined || this.focusedColumn === 0) {
-            return undefined;
+            return Result.Err<WorkspaceModel>(
+                ModelChangeErrors.NO_ACTION_TARGET,
+            );
         }
 
         const newCol = this.columns[this.focusedColumn - 1];
 
-        return newCol.getFocusedItem().value;
+        newCol.getFocusedItem().value.focus(global.get_current_time());
+
+        return Result.Err<WorkspaceModel>(ModelChangeErrors.ONLY_FOCUS_CHANGE);
     }
 
-    getItemOnRightOfFocus() {
+    focusItemOnRight() {
         if (
             this.focusedColumn === undefined ||
             this.focusedColumn === this.columns.length - 1
         ) {
-            return undefined;
+            return Result.Err<WorkspaceModel>(
+                ModelChangeErrors.NO_ACTION_TARGET,
+            );
         }
 
         const newCol = this.columns[this.focusedColumn + 1];
 
-        return newCol.getFocusedItem().value;
+        newCol.getFocusedItem().value.focus(global.get_current_time());
+
+        return Result.Err<WorkspaceModel>(ModelChangeErrors.ONLY_FOCUS_CHANGE);
     }
 
-    getItemAboveFocus() {
+    focusItemAbove() {
         const currColumn = this.getFocusedColumn();
 
-        if (currColumn === undefined) {
-            return undefined;
+        if (currColumn === undefined || currColumn.focusedItem === 0) {
+            return Result.Err<WorkspaceModel>(
+                ModelChangeErrors.NO_ACTION_TARGET,
+            );
         }
 
-        if (currColumn.focusedItem === 0) {
-            return undefined;
-        }
+        currColumn.items[currColumn.focusedItem - 1].value.focus(
+            global.get_current_time(),
+        );
 
-        return currColumn.items[currColumn.focusedItem - 1].value;
+        return Result.Err<WorkspaceModel>(ModelChangeErrors.ONLY_FOCUS_CHANGE);
     }
 
-    getItemBelowFocus() {
+    focusItemBelow() {
         const currColumn = this.getFocusedColumn();
 
-        if (currColumn === undefined) {
-            return undefined;
+        if (
+            currColumn === undefined ||
+            currColumn.focusedItem >= currColumn.items.length - 1
+        ) {
+            return Result.Err<WorkspaceModel>(
+                ModelChangeErrors.NO_ACTION_TARGET,
+            );
         }
 
-        if (currColumn.focusedItem >= currColumn.items.length - 1) {
-            return undefined;
-        }
+        currColumn.items[currColumn.focusedItem + 1].value.focus(
+            global.get_current_time(),
+        );
 
-        return currColumn.items[currColumn.focusedItem + 1].value;
+        return Result.Err<WorkspaceModel>(ModelChangeErrors.ONLY_FOCUS_CHANGE);
     }
 
     moveFocusedColumnUp(): Result<WorkspaceModel> {
         // TODO multi-workspace movement
-        return Result.Err<WorkspaceModel>(ModelChangeErrors.TODO);
+        return Result.Err<WorkspaceModel>(ModelChangeErrors.NO_ACTION_TARGET);
     }
 
     moveFocusedColumnDown(): Result<WorkspaceModel> {
         // TODO multi-workspace movement
-        return Result.Err<WorkspaceModel>(ModelChangeErrors.TODO);
+        return Result.Err<WorkspaceModel>(ModelChangeErrors.NO_ACTION_TARGET);
     }
 
     moveFocusedColumnLeft(): Result<WorkspaceModel> {

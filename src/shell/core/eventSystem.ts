@@ -1,13 +1,9 @@
 import { Result } from "../../shared.js";
 import { GLib, Meta } from "../dependencies.js";
 
-import { Debug } from "../utils/debug.js";
 import { Shortcuts } from "../utils/shortcuts.js";
 import { Timeouts } from "../utils/timeouts.js";
-import {
-    WorkspaceModelChangeErrors,
-    WorkspaceModel,
-} from "./workspaceModel.js";
+import { WorkspaceModel } from "./workspaceModel.js";
 import { WorkspaceModelManager } from "./workspaceModelManager.js";
 
 class EventGenerator {
@@ -252,12 +248,9 @@ class WindowOpenedEvent implements Event {
     }
 
     process() {
-        const workspaceModel = WorkspaceModelManager.getActiveWorkspaceModel();
-        const result = workspaceModel.insertWindow(this.window);
-
-        Debug.assert(result.isOk(), "Failed to insert window");
-
-        return result;
+        return WorkspaceModelManager.getActiveWorkspaceModel().insertWindow(
+            this.window,
+        );
     }
 }
 
@@ -271,15 +264,10 @@ class WindowClosedEvent implements Event {
     }
 
     process() {
-        const workspaceModel = WorkspaceModelManager.getActiveWorkspaceModel();
-        const result = workspaceModel.removeWindow(
+        return WorkspaceModelManager.getActiveWorkspaceModel().removeWindow(
             this.window,
             global.display.focus_window,
         );
-
-        Debug.assert(result.isOk(), "Failed to remove window");
-
-        return result;
     }
 }
 
@@ -293,68 +281,41 @@ class WindowFocusedEvent implements Event {
     }
 
     process() {
-        const workspaceModel = WorkspaceModelManager.getActiveWorkspaceModel();
-        const result = workspaceModel.relayout(this.window);
-
-        Debug.assert(result.isOk(), "Failed to relayout");
-
-        return result;
+        return WorkspaceModelManager.getActiveWorkspaceModel().relayout(
+            this.window,
+        );
     }
 }
 
 class MoveFocusLeftShortcutEvent implements Event {
     type = "MoveFocusLeftShortcutEvent";
 
-    process(): Result<WorkspaceModel> {
-        WorkspaceModelManager.getActiveWorkspaceModel()
-            .getItemOnLeftOfFocus()
-            ?.focus(global.get_current_time());
-
-        return Result.Err<WorkspaceModel>(
-            WorkspaceModelChangeErrors.NO_FOCUS_TARGET,
-        );
+    process() {
+        return WorkspaceModelManager.getActiveWorkspaceModel().focusItemOnLeft();
     }
 }
 
 class MoveFocusRightShortcutEvent implements Event {
     type = "MoveFocusRightShortcutEvent";
 
-    process(): Result<WorkspaceModel> {
-        WorkspaceModelManager.getActiveWorkspaceModel()
-            .getItemOnRightOfFocus()
-            ?.focus(global.get_current_time());
-
-        return Result.Err<WorkspaceModel>(
-            WorkspaceModelChangeErrors.NO_FOCUS_TARGET,
-        );
+    process() {
+        return WorkspaceModelManager.getActiveWorkspaceModel().focusItemOnRight();
     }
 }
 
 class MoveFocusUpShortcutEvent implements Event {
     type = "MoveFocusUpShortcutEvent";
 
-    process(): Result<WorkspaceModel> {
-        WorkspaceModelManager.getActiveWorkspaceModel()
-            .getItemAboveFocus()
-            ?.focus(global.get_current_time());
-
-        return Result.Err<WorkspaceModel>(
-            WorkspaceModelChangeErrors.NO_FOCUS_TARGET,
-        );
+    process() {
+        return WorkspaceModelManager.getActiveWorkspaceModel().focusItemAbove();
     }
 }
 
 class MoveFocusDownShortcutEvent implements Event {
     type = "MoveFocusDownShortcutEvent";
 
-    process(): Result<WorkspaceModel> {
-        WorkspaceModelManager.getActiveWorkspaceModel()
-            .getItemBelowFocus()
-            ?.focus(global.get_current_time());
-
-        return Result.Err<WorkspaceModel>(
-            WorkspaceModelChangeErrors.NO_FOCUS_TARGET,
-        );
+    process() {
+        return WorkspaceModelManager.getActiveWorkspaceModel().focusItemBelow();
     }
 }
 
