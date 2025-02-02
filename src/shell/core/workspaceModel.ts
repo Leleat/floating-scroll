@@ -6,7 +6,7 @@ import {
     Result,
     WindowOpeningPosition,
 } from "../../shared.js";
-import { Debug } from "../utils/debug.js";
+import { Debug, decorateFnWithLog } from "../utils/debug.js";
 import { Settings } from "../utils/settings.js";
 import { WorkspaceModelManager } from "./workspaceModelManager.js";
 import { Signals } from "../dependencies.js";
@@ -33,8 +33,9 @@ type ModelChangeErrors =
     (typeof ModelChangeErrors)[keyof typeof ModelChangeErrors];
 
 class Item {
-    public readonly value!: Meta.Window;
-    public readonly rect!: Rect;
+    readonly value!: Meta.Window;
+    readonly rect!: Rect;
+
     private padding!: number;
 
     constructor({ value, rect }: { value: Meta.Window; rect: Rect }) {
@@ -58,6 +59,7 @@ class Item {
         );
     }
 
+    @decorateFnWithLog("log", "Item")
     destroy() {
         Settings.unwatch(this);
 
@@ -67,6 +69,7 @@ class Item {
         this.rect = null;
     }
 
+    @decorateFnWithLog("log", "Item")
     clone({
         value = this.value,
         rect = this.rect,
@@ -77,18 +80,22 @@ class Item {
         return new Item({ value, rect: { ...this.rect, ...rect } });
     }
 
+    @decorateFnWithLog("log", "Item")
     contains(v: Meta.Window) {
         return v === this.value;
     }
 
+    @decorateFnWithLog("log", "Item")
     equals(otherItem: Item) {
         return this.value === otherItem.value;
     }
 
+    @decorateFnWithLog("log", "Item")
     getFocusedWindow() {
         return this.value;
     }
 
+    @decorateFnWithLog("log", "Item")
     sync() {
         const workArea = this.value.get_work_area_current_monitor();
         const windowActor =
@@ -155,6 +162,7 @@ class Column {
         );
     }
 
+    @decorateFnWithLog("log", "Column")
     destroy() {
         // @ts-expect-error null out
         this.focusedItem = null;
@@ -165,6 +173,7 @@ class Column {
         this.rect = null;
     }
 
+    @decorateFnWithLog("log", "Column")
     clone({
         items = this.items.map((i) => i.clone()),
         focusedItem = this.focusedItem,
@@ -172,10 +181,12 @@ class Column {
         return new Column({ items, focusedItem });
     }
 
+    @decorateFnWithLog("log", "Column")
     contains(v: Meta.Window) {
         return this.items.some((item) => item.contains(v));
     }
 
+    @decorateFnWithLog("log", "Column")
     equals(otherCol: Column) {
         return (
             this.items.length === otherCol.items.length &&
@@ -183,10 +194,12 @@ class Column {
         );
     }
 
+    @decorateFnWithLog("log", "Column")
     getFocusedItem() {
         return this.items[this.focusedItem];
     }
 
+    @decorateFnWithLog("log", "Column")
     shift({ dx = 0, dy = 0 } = {}) {
         return new Column({
             focusedItem: this.focusedItem,
@@ -210,6 +223,7 @@ class WorkspaceGrid {
 }
 
 class WorkspaceModel extends Signals.EventEmitter {
+    @decorateFnWithLog("log", "WorkspaceModel")
     static build({
         initialWindow,
     }: {
@@ -261,6 +275,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         this.workArea = workArea;
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     destroy() {
         this.columns.forEach((col) => col.destroy());
         // @ts-expect-error null out
@@ -273,6 +288,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         this.disconnectAll();
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     clone({
         focusedColumn = this.focusedColumn,
         columns = this.columns.map((col) => col.clone()),
@@ -289,6 +305,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         });
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     getGrid() {
         return new WorkspaceGrid({
             workArea: this.workArea,
@@ -298,6 +315,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         });
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     relayout(window: Meta.Window): Result<WorkspaceModel> {
         const { focusedColumn: newFocusedColumn, focusedItem: newFocusItem } =
             this.findFocusedIndices(window);
@@ -334,6 +352,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         );
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     focusItemOnLeft() {
         if (this.focusedColumn === 0) {
             return Result.Err<WorkspaceModel>(
@@ -348,6 +367,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         return Result.Err<WorkspaceModel>(ModelChangeErrors.ONLY_FOCUS_CHANGE);
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     focusItemOnRight() {
         if (this.focusedColumn === this.columns.length - 1) {
             return Result.Err<WorkspaceModel>(
@@ -362,6 +382,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         return Result.Err<WorkspaceModel>(ModelChangeErrors.ONLY_FOCUS_CHANGE);
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     focusItemAbove() {
         const currColumn = this.columns[this.focusedColumn];
 
@@ -378,6 +399,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         return Result.Err<WorkspaceModel>(ModelChangeErrors.ONLY_FOCUS_CHANGE);
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     focusItemBelow() {
         const currColumn = this.columns[this.focusedColumn];
 
@@ -394,16 +416,19 @@ class WorkspaceModel extends Signals.EventEmitter {
         return Result.Err<WorkspaceModel>(ModelChangeErrors.ONLY_FOCUS_CHANGE);
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     moveFocusedColumnUp(): Result<WorkspaceModel> {
         // TODO multi-workspace movement
         return Result.Err<WorkspaceModel>(ModelChangeErrors.NO_ACTION_TARGET);
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     moveFocusedColumnDown(): Result<WorkspaceModel> {
         // TODO multi-workspace movement
         return Result.Err<WorkspaceModel>(ModelChangeErrors.NO_ACTION_TARGET);
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     moveFocusedColumnLeft(): Result<WorkspaceModel> {
         const col = this.columns[this.focusedColumn];
 
@@ -428,6 +453,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         return model.relayout(window);
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     moveFocusedColumnRight(): Result<WorkspaceModel> {
         const col = this.columns[this.focusedColumn];
 
@@ -452,6 +478,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         return model.relayout(window);
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     moveFocusedItemUp(): Result<WorkspaceModel> {
         const currColumn = this.columns[this.focusedColumn];
 
@@ -484,6 +511,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         return model.relayout(currColumn.items[currColumn.focusedItem].value);
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     moveFocusedItemDown(): Result<WorkspaceModel> {
         const currColumn = this.columns[this.focusedColumn];
 
@@ -513,6 +541,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         return model.relayout(currColumn.items[currColumn.focusedItem].value);
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     moveFocusedItemLeft(): Result<WorkspaceModel> {
         const fromColumn = this.columns[this.focusedColumn];
 
@@ -571,6 +600,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         }).relayout(window);
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     moveFocusedItemRight(): Result<WorkspaceModel> {
         const fromColumn = this.columns[this.focusedColumn];
 
@@ -633,6 +663,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         }).relayout(window);
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     insertWindow(window: Meta.Window): Result<WorkspaceModel> {
         Debug.assert(
             this.columns.every(
@@ -685,6 +716,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         }).relayout(window);
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     removeWindow(
         window: Meta.Window,
         newFocus: Meta.Window | null,
@@ -734,6 +766,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         }).relayout(newFocus);
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     private findFocusedIndices(window: Meta.Window) {
         const indices: {
             focusedColumn: number | undefined;
@@ -756,14 +789,17 @@ class WorkspaceModel extends Signals.EventEmitter {
         return indices;
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     private calculateTotalWidth(columns: NonEmptyArray<Column>) {
         return columns.reduce((acc, col) => acc + col.rect.width, 0);
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     private calculateTotalHeight(items: NonEmptyArray<Item>) {
         return items.reduce((acc, item) => acc + item.rect.height, 0);
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     private alignColumns(
         index: number,
         columns: NonEmptyArray<Column>,
@@ -814,6 +850,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         return resultCols;
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     private alignItems(
         newFocusIndex: number,
         items: NonEmptyArray<Item>,
@@ -854,6 +891,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         return resultItems;
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     private calculatePlacementOnMainAxis(
         newFocusColumn: number,
         columns: NonEmptyArray<Column>,
@@ -876,6 +914,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         );
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     private calculatePlacementOnCrossAxis(
         newFocusItem: number,
         items: NonEmptyArray<Item>,
@@ -894,6 +933,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         );
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     private centerOnMainAxis(
         newFocusIndex: number,
         columns: NonEmptyArray<Column>,
@@ -918,6 +958,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         return this.alignColumns(newFocusIndex, columns, resultCols);
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     private centerOnCrossAxis(
         newFocusIndex: number,
         items: NonEmptyArray<Item>,
@@ -937,6 +978,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         return this.alignItems(newFocusIndex, items, resultItems);
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     private lazyFollowOnMainAxis(
         newFocusColumn: number,
         columns: NonEmptyArray<Column>,
@@ -1023,6 +1065,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         }
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     private centerAllColumnsOnMainAxis(
         columns: NonEmptyArray<Column>,
         workspace: Rect,
@@ -1043,6 +1086,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         return this.alignColumns(0, columns, [placedFirstCol]);
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     private alignToLeftMostColForLazyFollowOnMainAxis(
         leftMostFullyVisColumn: Column,
         columns: NonEmptyArray<Column>,
@@ -1068,6 +1112,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         return this.alignColumns(leftMostIndex, columns, [placedCol]);
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     private alignToRightMostColForLazyFollowOnMainAxis(
         rightMostFullyVisColumn: Column,
         columns: NonEmptyArray<Column>,
@@ -1094,6 +1139,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         return this.alignColumns(rightMostIndex, columns, [placedCol]);
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     private lazyFollowOnCrossAxis(
         newFocusItem: number,
         items: NonEmptyArray<Item>,
@@ -1176,6 +1222,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         }
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     private alignToTopMostItemForLazyFollowOnCrossAxis(
         topMostItem: Item,
         items: NonEmptyArray<Item>,
@@ -1186,6 +1233,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         return this.alignItems(topMostIndex, items, [placedItem]);
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     private alignToBottomMostItemForLazyFollowOnCrossAxis(
         bottomMostItem: Item,
         items: NonEmptyArray<Item>,
@@ -1199,6 +1247,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         return this.alignItems(bottomMostIndex, items, [placedItem]);
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     private centerAllItemsOnCrossAxis(
         items: NonEmptyArray<Item>,
         workspace: Rect,
@@ -1212,6 +1261,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         return this.alignItems(0, items, [placedFirstItem]);
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     private insertWindowOnLeftOfFocus(
         window: Meta.Window,
         mrus: Meta.Window[],
@@ -1248,6 +1298,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         ];
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     private insertWindowOnRightOfFocus(
         window: Meta.Window,
         mrus: Meta.Window[],
@@ -1284,6 +1335,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         ];
     }
 
+    @decorateFnWithLog("log", "WorkspaceModel")
     private insertWindowBetweenMrus(
         window: Meta.Window,
         mrus: Meta.Window[],

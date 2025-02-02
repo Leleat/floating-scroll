@@ -1,5 +1,6 @@
 import { Result } from "../../shared.js";
 import { GLib, Meta } from "../dependencies.js";
+import { decorateFnWithLog } from "../utils/debug.js";
 
 import { Shortcuts } from "../utils/shortcuts.js";
 import { Timeouts } from "../utils/timeouts.js";
@@ -165,6 +166,7 @@ class EventGenerator {
         });
     }
 
+    @decorateFnWithLog("log", "EventGenerator", { color: "Cyan" })
     private onWindowCreated(window: Meta.Window) {
         if (window.get_window_type() !== Meta.WindowType.NORMAL) {
             return;
@@ -185,6 +187,7 @@ class EventGenerator {
         );
     }
 
+    @decorateFnWithLog("log", "EventGenerator", { color: "Cyan" })
     private onFocusWindowChanged() {
         const window = global.display.focus_window;
 
@@ -199,6 +202,7 @@ class EventGenerator {
         this.generateEvent(new WindowFocusedEvent({ window }));
     }
 
+    @decorateFnWithLog("log", "EventGenerator", { color: "Cyan" })
     private onWindowActorFirstFrame(windowActor: Meta.WindowActor) {
         const window = windowActor.get_meta_window() as Meta.Window;
 
@@ -207,6 +211,7 @@ class EventGenerator {
         window.isTrackedByFloatingScroll = true;
     }
 
+    @decorateFnWithLog("log", "EventGenerator", { color: "Cyan" })
     private onWindowUnmanaging(window: Meta.Window) {
         this.generateEvent(new WindowClosedEvent({ window }));
     }
@@ -290,6 +295,7 @@ class WindowOpenedEvent extends WorkspaceModelModificationEvent {
         this.window = window;
     }
 
+    @decorateFnWithLog("log", "WindowOpenedEvent", { color: "Cyan" })
     process() {
         const workspaceModel = WorkspaceModelManager.getWorkspaceModel();
 
@@ -313,6 +319,7 @@ class WindowClosedEvent extends WorkspaceModelModificationEvent {
         this.window = window;
     }
 
+    @decorateFnWithLog("log", "WindowClosedEvent", { color: "Cyan" })
     process() {
         const newModel =
             WorkspaceModelManager.getWorkspaceModel()!.removeWindow(
@@ -338,6 +345,7 @@ class WindowFocusedEvent extends WorkspaceModelModificationEvent {
         this.window = window;
     }
 
+    @decorateFnWithLog("log", "WindowFocusedEvent", { color: "Cyan" })
     process() {
         this.model = WorkspaceModelManager.getWorkspaceModel()!
             .relayout(this.window)
@@ -352,6 +360,7 @@ class MoveFocusLeftShortcutEvent extends FocusChangeEvent {
         super({ type: "MoveFocusLeftShortcutEvent" });
     }
 
+    @decorateFnWithLog("log", "MoveFocusLeftShortcutEvent", { color: "Cyan" })
     process() {
         const model = WorkspaceModelManager.getWorkspaceModel();
 
@@ -373,6 +382,7 @@ class MoveFocusRightShortcutEvent extends FocusChangeEvent {
         super({ type: "MoveFocusRightShortcutEvent" });
     }
 
+    @decorateFnWithLog("log", "MoveFocusRightShortcutEvent", { color: "Cyan" })
     process() {
         const model = WorkspaceModelManager.getWorkspaceModel();
 
@@ -394,6 +404,7 @@ class MoveFocusUpShortcutEvent extends FocusChangeEvent {
         super({ type: "MoveFocusUpShortcutEvent" });
     }
 
+    @decorateFnWithLog("log", "MoveFocusUpShortcutEvent", { color: "Cyan" })
     process() {
         const model = WorkspaceModelManager.getWorkspaceModel();
 
@@ -415,6 +426,7 @@ class MoveFocusDownShortcutEvent extends FocusChangeEvent {
         super({ type: "MoveFocusDownShortcutEvent" });
     }
 
+    @decorateFnWithLog("log", "MoveFocusDownShortcutEvent", { color: "Cyan" })
     process() {
         const model = WorkspaceModelManager.getWorkspaceModel();
 
@@ -436,6 +448,7 @@ class MoveColumnUpShortcutEvent extends WorkspaceModelModificationEvent {
         super({ type: "MoveColumnUpShortcutEvent" });
     }
 
+    @decorateFnWithLog("log", "MoveColumnUpShortcutEvent", { color: "Cyan" })
     process() {
         // TODO
         return Result.Err<WorkspaceChangeEvent>("No active workspace model");
@@ -447,6 +460,7 @@ class MoveColumnDownShortcutEvent extends WorkspaceModelModificationEvent {
         super({ type: "MoveColumnDownShortcutEvent" });
     }
 
+    @decorateFnWithLog("log", "MoveColumnDownShortcutEvent", { color: "Cyan" })
     process() {
         // TODO
         return Result.Err<WorkspaceChangeEvent>("No active workspace model");
@@ -458,6 +472,7 @@ class MoveColumnLeftShortcutEvent extends WorkspaceModelModificationEvent {
         super({ type: "MoveColumnLeftShortcutEvent" });
     }
 
+    @decorateFnWithLog("log", "MoveColumnLeftShortcutEvent", { color: "Cyan" })
     process() {
         const model = WorkspaceModelManager.getWorkspaceModel();
 
@@ -482,6 +497,7 @@ class MoveColumnRightShortcutEvent extends WorkspaceModelModificationEvent {
         super({ type: "MoveColumnRightShortcutEvent" });
     }
 
+    @decorateFnWithLog("log", "MoveColumnRightShortcutEvent", { color: "Cyan" })
     process() {
         const model = WorkspaceModelManager.getWorkspaceModel();
 
@@ -506,6 +522,7 @@ class MoveItemUpShortcutEvent extends WorkspaceModelModificationEvent {
         super({ type: "MoveItemUpShortcutEvent" });
     }
 
+    @decorateFnWithLog("log", "MoveItemUpShortcutEvent", { color: "Cyan" })
     process() {
         const model = WorkspaceModelManager.getWorkspaceModel();
 
@@ -530,6 +547,7 @@ class MoveItemDownShortcutEvent extends WorkspaceModelModificationEvent {
         super({ type: "MoveItemDownShortcutEvent" });
     }
 
+    @decorateFnWithLog("log", "MoveItemDownShortcutEvent", { color: "Cyan" })
     process() {
         const model = WorkspaceModelManager.getWorkspaceModel();
 
@@ -554,6 +572,7 @@ class MoveItemLeftShortcutEvent extends WorkspaceModelModificationEvent {
         super({ type: "MoveItemLeftShortcutEvent" });
     }
 
+    @decorateFnWithLog("log", "MoveItemLeftShortcutEvent", { color: "Cyan" })
     process() {
         const model = WorkspaceModelManager.getWorkspaceModel();
 
@@ -578,6 +597,7 @@ class MoveItemRightShortcutEvent extends WorkspaceModelModificationEvent {
         super({ type: "MoveItemRightShortcutEvent" });
     }
 
+    @decorateFnWithLog("log", "MoveItemRightShortcutEvent", { color: "Cyan" })
     process() {
         const model = WorkspaceModelManager.getWorkspaceModel();
 

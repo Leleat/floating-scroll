@@ -1,5 +1,5 @@
 import { GLib } from "../dependencies.js";
-import { Debug } from "../utils/debug.js";
+import { Debug, decorateFnWithLog } from "../utils/debug.js";
 
 import { Timeouts } from "../utils/timeouts.js";
 import {
@@ -29,6 +29,7 @@ class WorkspaceView {
         this.eventGenerator.sub(this, (e) => this.onEvent(e));
     }
 
+    @decorateFnWithLog("log", "WorkspaceView")
     destroy() {
         this.eventGenerator.destroy();
         this.eventGenerator = null!;
@@ -37,6 +38,7 @@ class WorkspaceView {
         this.eventProcessor = null!;
     }
 
+    @decorateFnWithLog("log", "WorkspaceView", { color: "Cyan" })
     private onEvent(event: WorkspaceChangeEvent) {
         this.eventProcessor
             .processEvent(event)
@@ -51,6 +53,7 @@ class WorkspaceView {
             });
     }
 
+    @decorateFnWithLog("log", "WorkspaceView")
     private update(model: WorkspaceModel) {
         // TODO Just quick hack to not redo the updates for all events since
         // TODO many "focus-change" events are sent, for instance, when opening
