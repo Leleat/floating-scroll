@@ -105,11 +105,14 @@ class Cell {
         // So just hide the actor if the window is meant to be offscreen but
         // constrained to be onscreen by mutter.
         const offScreenLimit = 75;
-        const isOffScreen =
+        const isOffScreenH =
             this.rect.x + this.rect.width <= offScreenLimit ||
             this.rect.x >= workArea.x + workArea.width - offScreenLimit;
+        const isOffScreenV =
+            this.rect.y + this.rect.height <= offScreenLimit ||
+            this.rect.y >= workArea.y + workArea.height - offScreenLimit;
 
-        if (isOffScreen) {
+        if (isOffScreenH || isOffScreenV) {
             windowActor.hide();
         } else {
             windowActor.show();
