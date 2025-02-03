@@ -24,7 +24,7 @@ const ModelChangeErrors = Object.freeze({
     NO_FOCUS_TARGET: "No target to focus on found",
     NO_ACTION_TARGET: "No target to act on found",
     NO_MOVEMENT_POSSIBLE:
-        "No movement possible because item/col is already at the edge",
+        "No movement possible because cell/col is already at the edge",
     ONLY_FOCUS_CHANGE:
         "Only focus change, which should be ignored, because a relayout will follow",
 });
@@ -32,7 +32,7 @@ const ModelChangeErrors = Object.freeze({
 type ModelChangeErrors =
     (typeof ModelChangeErrors)[keyof typeof ModelChangeErrors];
 
-class Item {
+class Cell {
     readonly value!: Meta.Window;
     readonly rect!: Rect;
 
@@ -59,7 +59,7 @@ class Item {
         );
     }
 
-    @decorateFnWithLog("log", "Item")
+    @decorateFnWithLog("log", "Cell")
     destroy() {
         Settings.unwatch(this);
 
@@ -69,7 +69,7 @@ class Item {
         this.rect = null;
     }
 
-    @decorateFnWithLog("log", "Item")
+    @decorateFnWithLog("log", "Cell")
     clone({
         value = this.value,
         rect = this.rect,
@@ -77,25 +77,25 @@ class Item {
         value?: Meta.Window;
         rect?: { x?: number; y?: number; width?: number; height?: number };
     } = {}) {
-        return new Item({ value, rect: { ...this.rect, ...rect } });
+        return new Cell({ value, rect: { ...this.rect, ...rect } });
     }
 
-    @decorateFnWithLog("log", "Item")
+    @decorateFnWithLog("log", "Cell")
     contains(v: Meta.Window) {
         return v === this.value;
     }
 
-    @decorateFnWithLog("log", "Item")
-    equals(otherItem: Item) {
-        return this.value === otherItem.value;
+    @decorateFnWithLog("log", "Cell")
+    equals(otherCell: Cell) {
+        return this.value === otherCell.value;
     }
 
-    @decorateFnWithLog("log", "Item")
-    getFocusedWindow() {
+    @decorateFnWithLog("log", "Cell")
+    getSelectedWindow() {
         return this.value;
     }
 
-    @decorateFnWithLog("log", "Item")
+    @decorateFnWithLog("log", "Cell")
     sync() {
         const workArea = this.value.get_work_area_current_monitor();
         const windowActor =
@@ -125,32 +125,32 @@ class Item {
 }
 
 class Column {
-    readonly focusedItem: number = 0;
-    readonly items: NonEmptyArray<Item> = [];
+    readonly cells: NonEmptyArray<Cell> = [];
+    readonly selected: number = 0;
     readonly rect: Rect;
 
     constructor({
-        items,
-        focusedItem = 0,
+        cells,
+        selected = 0,
     }: {
-        items: NonEmptyArray<Item>;
-        focusedItem?: number;
+        cells: NonEmptyArray<Cell>;
+        selected: number;
     }) {
-        Debug.assert(items.length > 0, "Items must be non-empty.");
+        Debug.assert(cells.length > 0, "Cells must be non-empty.");
         Debug.assert(
-            focusedItem >= 0 && focusedItem < items.length,
-            `focus must be a valid index: ${focusedItem}`,
+            selected >= 0 && selected < cells.length,
+            `Selection must be a valid index: ${selected}`,
         );
 
-        this.focusedItem = focusedItem;
-        this.items = items;
-        this.rect = items.reduce(
-            (acc, item) => {
+        this.selected = selected;
+        this.cells = cells;
+        this.rect = cells.reduce(
+            (acc, cell) => {
                 return {
-                    x: Math.min(acc.x, item.rect.x),
-                    y: Math.min(acc.y, item.rect.y),
-                    width: Math.max(acc.width, item.rect.width),
-                    height: acc.height + item.rect.height,
+                    x: Math.min(acc.x, cell.rect.x),
+                    y: Math.min(acc.y, cell.rect.y),
+                    width: Math.max(acc.width, cell.rect.width),
+                    height: acc.height + cell.rect.height,
                 };
             },
             {
@@ -165,47 +165,47 @@ class Column {
     @decorateFnWithLog("log", "Column")
     destroy() {
         // @ts-expect-error null out
-        this.focusedItem = null;
-        this.items.forEach((item) => item.destroy());
+        this.selected = null;
+        this.cells.forEach((c) => c.destroy());
         // @ts-expect-error null out
-        this.items = null;
+        this.cells = null;
         // @ts-expect-error null out
         this.rect = null;
     }
 
     @decorateFnWithLog("log", "Column")
     clone({
-        items = this.items.map((i) => i.clone()),
-        focusedItem = this.focusedItem,
+        cells = this.cells.map((i) => i.clone()),
+        selected = this.selected,
     } = {}) {
-        return new Column({ items, focusedItem });
+        return new Column({ cells, selected });
     }
 
     @decorateFnWithLog("log", "Column")
     contains(v: Meta.Window) {
-        return this.items.some((item) => item.contains(v));
+        return this.cells.some((c) => c.contains(v));
     }
 
     @decorateFnWithLog("log", "Column")
     equals(otherCol: Column) {
         return (
-            this.items.length === otherCol.items.length &&
-            this.items.every((item, i) => item.equals(otherCol.items[i]))
+            this.cells.length === otherCol.cells.length &&
+            this.cells.every((c, i) => c.equals(otherCol.cells[i]))
         );
     }
 
     @decorateFnWithLog("log", "Column")
-    getFocusedItem() {
-        return this.items[this.focusedItem];
+    getSelectedCell() {
+        return this.cells[this.selected];
     }
 
     @decorateFnWithLog("log", "Column")
     shift({ dx = 0, dy = 0 } = {}) {
         return new Column({
-            focusedItem: this.focusedItem,
-            items: this.items.map((item) => {
-                return item.clone({
-                    rect: { x: item.rect.x + dx, y: item.rect.y + dy },
+            selected: this.selected,
+            cells: this.cells.map((cell) => {
+                return cell.clone({
+                    rect: { x: cell.rect.x + dx, y: cell.rect.y + dy },
                 });
             }),
         });
@@ -213,11 +213,11 @@ class Column {
 }
 
 class WorkspaceGrid {
-    readonly items: Item[][];
+    readonly cells: Cell[][];
     readonly workArea: Rect;
 
-    constructor({ items, workArea }: { items: Item[][]; workArea: Rect }) {
-        this.items = items;
+    constructor({ cells, workArea }: { cells: Cell[][]; workArea: Rect }) {
+        this.cells = cells;
         this.workArea = workArea;
     }
 }
@@ -230,7 +230,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         initialWindow: Meta.Window;
     }): WorkspaceModel {
         const frameRect = initialWindow.get_frame_rect();
-        const item = new Item({
+        const cell = new Cell({
             value: initialWindow,
             rect: {
                 x: 0,
@@ -240,8 +240,8 @@ class WorkspaceModel extends Signals.EventEmitter {
             },
         });
         const unplacedModel = new WorkspaceModel({
-            columns: [new Column({ items: [item] })],
-            focusedColumn: 0,
+            columns: [new Column({ cells: [cell], selected: 0 })],
+            selected: 0,
             workArea: initialWindow.get_work_area_current_monitor(),
         });
 
@@ -249,16 +249,16 @@ class WorkspaceModel extends Signals.EventEmitter {
     }
 
     private readonly columns: NonEmptyArray<Column>;
-    private readonly focusedColumn: number;
+    private readonly selected: number;
     private readonly workArea: Rect;
 
     constructor({
         columns,
-        focusedColumn,
+        selected,
         workArea,
     }: {
         columns: NonEmptyArray<Column>;
-        focusedColumn: number;
+        selected: number;
         workArea: Rect;
     }) {
         super();
@@ -271,7 +271,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         );
 
         this.columns = columns;
-        this.focusedColumn = focusedColumn;
+        this.selected = selected;
         this.workArea = workArea;
     }
 
@@ -290,17 +290,17 @@ class WorkspaceModel extends Signals.EventEmitter {
 
     @decorateFnWithLog("log", "WorkspaceModel")
     clone({
-        focusedColumn = this.focusedColumn,
+        selected = this.selected,
         columns = this.columns.map((col) => col.clone()),
         workArea = this.workArea,
     }: {
-        focusedColumn?: number;
+        selected?: number;
         columns?: NonEmptyArray<Column>;
         workArea?: Rect;
     } = {}) {
         return new WorkspaceModel({
             columns,
-            focusedColumn,
+            selected,
             workArea,
         });
     }
@@ -309,44 +309,46 @@ class WorkspaceModel extends Signals.EventEmitter {
     getGrid() {
         return new WorkspaceGrid({
             workArea: this.workArea,
-            items: this.columns.map((col) => {
-                return col.items.map((item) => item.clone());
+            cells: this.columns.map((col) => {
+                return col.cells.map((c) => c.clone());
             }),
         });
     }
 
     @decorateFnWithLog("log", "WorkspaceModel")
     relayout(window: Meta.Window): Result<WorkspaceModel> {
-        const { focusedColumn: newFocusedColumn, focusedItem: newFocusItem } =
-            this.findFocusedIndices(window);
+        const {
+            selectedColumn: newSelectedColIdx,
+            selectedCell: newSelectedCellIdx,
+        } = this.findSelectedIndices(window);
 
         Debug.assert(
-            newFocusedColumn !== undefined && newFocusItem !== undefined,
+            newSelectedColIdx !== undefined && newSelectedCellIdx !== undefined,
             `Window not found in workspace: ${window}`,
         );
 
         const placedCols = this.calculatePlacementOnMainAxis(
-            newFocusedColumn,
+            newSelectedColIdx,
             this.columns,
             this.workArea,
         );
-        const placedFocusedCol = placedCols[newFocusedColumn];
-        const placedItems = this.calculatePlacementOnCrossAxis(
-            newFocusItem,
-            placedFocusedCol.items,
+        const placedSelectedCol = placedCols[newSelectedColIdx];
+        const placedCells = this.calculatePlacementOnCrossAxis(
+            newSelectedCellIdx,
+            placedSelectedCol.cells,
             this.workArea,
         );
 
         return Result.Ok<WorkspaceModel>(
             new WorkspaceModel({
                 columns: placedCols.with(
-                    newFocusedColumn,
+                    newSelectedColIdx,
                     new Column({
-                        items: placedItems,
-                        focusedItem: newFocusItem,
+                        cells: placedCells,
+                        selected: newSelectedCellIdx,
                     }),
                 ),
-                focusedColumn: newFocusedColumn,
+                selected: newSelectedColIdx,
                 workArea: this.workArea,
             }),
         );
@@ -354,45 +356,45 @@ class WorkspaceModel extends Signals.EventEmitter {
 
     @decorateFnWithLog("log", "WorkspaceModel")
     focusItemOnLeft() {
-        if (this.focusedColumn === 0) {
+        if (this.selected === 0) {
             return Result.Err<WorkspaceModel>(
                 ModelChangeErrors.NO_ACTION_TARGET,
             );
         }
 
-        const newCol = this.columns[this.focusedColumn - 1];
+        const newCol = this.columns[this.selected - 1];
 
-        newCol.getFocusedItem().value.focus(global.get_current_time());
+        newCol.getSelectedCell().value.focus(global.get_current_time());
 
         return Result.Err<WorkspaceModel>(ModelChangeErrors.ONLY_FOCUS_CHANGE);
     }
 
     @decorateFnWithLog("log", "WorkspaceModel")
     focusItemOnRight() {
-        if (this.focusedColumn === this.columns.length - 1) {
+        if (this.selected === this.columns.length - 1) {
             return Result.Err<WorkspaceModel>(
                 ModelChangeErrors.NO_ACTION_TARGET,
             );
         }
 
-        const newCol = this.columns[this.focusedColumn + 1];
+        const newCol = this.columns[this.selected + 1];
 
-        newCol.getFocusedItem().value.focus(global.get_current_time());
+        newCol.getSelectedCell().value.focus(global.get_current_time());
 
         return Result.Err<WorkspaceModel>(ModelChangeErrors.ONLY_FOCUS_CHANGE);
     }
 
     @decorateFnWithLog("log", "WorkspaceModel")
     focusItemAbove() {
-        const currColumn = this.columns[this.focusedColumn];
+        const currColumn = this.columns[this.selected];
 
-        if (currColumn.focusedItem === 0) {
+        if (currColumn.selected === 0) {
             return Result.Err<WorkspaceModel>(
                 ModelChangeErrors.NO_ACTION_TARGET,
             );
         }
 
-        currColumn.items[currColumn.focusedItem - 1].value.focus(
+        currColumn.cells[currColumn.selected - 1].value.focus(
             global.get_current_time(),
         );
 
@@ -401,15 +403,15 @@ class WorkspaceModel extends Signals.EventEmitter {
 
     @decorateFnWithLog("log", "WorkspaceModel")
     focusItemBelow() {
-        const currColumn = this.columns[this.focusedColumn];
+        const currColumn = this.columns[this.selected];
 
-        if (currColumn.focusedItem >= currColumn.items.length - 1) {
+        if (currColumn.selected >= currColumn.cells.length - 1) {
             return Result.Err<WorkspaceModel>(
                 ModelChangeErrors.NO_ACTION_TARGET,
             );
         }
 
-        currColumn.items[currColumn.focusedItem + 1].value.focus(
+        currColumn.cells[currColumn.selected + 1].value.focus(
             global.get_current_time(),
         );
 
@@ -430,23 +432,23 @@ class WorkspaceModel extends Signals.EventEmitter {
 
     @decorateFnWithLog("log", "WorkspaceModel")
     moveFocusedColumnLeft(): Result<WorkspaceModel> {
-        const col = this.columns[this.focusedColumn];
+        const col = this.columns[this.selected];
 
-        if (this.focusedColumn === 0) {
+        if (this.selected === 0) {
             return Result.Err<WorkspaceModel>(
                 ModelChangeErrors.NO_MOVEMENT_POSSIBLE,
             );
         }
 
-        const window = col.items[col.focusedItem].value;
+        const window = col.cells[col.selected].value;
         const model = new WorkspaceModel({
             workArea: this.workArea,
-            focusedColumn: this.focusedColumn - 1,
+            selected: this.selected - 1,
             columns: [
-                ...this.columns.slice(0, this.focusedColumn - 1),
-                this.columns[this.focusedColumn],
-                this.columns[this.focusedColumn - 1],
-                ...this.columns.slice(this.focusedColumn + 1),
+                ...this.columns.slice(0, this.selected - 1),
+                this.columns[this.selected],
+                this.columns[this.selected - 1],
+                ...this.columns.slice(this.selected + 1),
             ],
         });
 
@@ -455,23 +457,23 @@ class WorkspaceModel extends Signals.EventEmitter {
 
     @decorateFnWithLog("log", "WorkspaceModel")
     moveFocusedColumnRight(): Result<WorkspaceModel> {
-        const col = this.columns[this.focusedColumn];
+        const col = this.columns[this.selected];
 
-        if (this.focusedColumn >= this.columns.length - 1) {
+        if (this.selected >= this.columns.length - 1) {
             return Result.Err<WorkspaceModel>(
                 ModelChangeErrors.NO_MOVEMENT_POSSIBLE,
             );
         }
 
-        const window = col.items[col.focusedItem].value;
+        const window = col.cells[col.selected].value;
         const model = new WorkspaceModel({
             workArea: this.workArea,
-            focusedColumn: this.focusedColumn + 1,
+            selected: this.selected + 1,
             columns: [
-                ...this.columns.slice(0, this.focusedColumn),
-                this.columns[this.focusedColumn + 1],
-                this.columns[this.focusedColumn],
-                ...this.columns.slice(this.focusedColumn + 2),
+                ...this.columns.slice(0, this.selected),
+                this.columns[this.selected + 1],
+                this.columns[this.selected],
+                ...this.columns.slice(this.selected + 2),
             ],
         });
 
@@ -480,9 +482,9 @@ class WorkspaceModel extends Signals.EventEmitter {
 
     @decorateFnWithLog("log", "WorkspaceModel")
     moveFocusedItemUp(): Result<WorkspaceModel> {
-        const currColumn = this.columns[this.focusedColumn];
+        const currColumn = this.columns[this.selected];
 
-        if (currColumn.focusedItem === 0) {
+        if (currColumn.selected === 0) {
             return Result.Err<WorkspaceModel>(
                 ModelChangeErrors.NO_MOVEMENT_POSSIBLE,
             );
@@ -490,32 +492,29 @@ class WorkspaceModel extends Signals.EventEmitter {
 
         const model = new WorkspaceModel({
             workArea: this.workArea,
-            focusedColumn: this.focusedColumn,
+            selected: this.selected,
             columns: this.columns.with(
-                this.focusedColumn,
+                this.selected,
                 new Column({
-                    focusedItem: currColumn.focusedItem - 1,
-                    items: [
-                        ...currColumn.items.slice(
-                            0,
-                            currColumn.focusedItem - 1,
-                        ),
-                        currColumn.items[currColumn.focusedItem],
-                        currColumn.items[currColumn.focusedItem - 1],
-                        ...currColumn.items.slice(currColumn.focusedItem + 1),
+                    selected: currColumn.selected - 1,
+                    cells: [
+                        ...currColumn.cells.slice(0, currColumn.selected - 1),
+                        currColumn.cells[currColumn.selected],
+                        currColumn.cells[currColumn.selected - 1],
+                        ...currColumn.cells.slice(currColumn.selected + 1),
                     ],
                 }),
             ),
         });
 
-        return model.relayout(currColumn.items[currColumn.focusedItem].value);
+        return model.relayout(currColumn.cells[currColumn.selected].value);
     }
 
     @decorateFnWithLog("log", "WorkspaceModel")
     moveFocusedItemDown(): Result<WorkspaceModel> {
-        const currColumn = this.columns[this.focusedColumn];
+        const currColumn = this.columns[this.selected];
 
-        if (currColumn.focusedItem >= currColumn.items.length - 1) {
+        if (currColumn.selected >= currColumn.cells.length - 1) {
             return Result.Err<WorkspaceModel>(
                 ModelChangeErrors.NO_MOVEMENT_POSSIBLE,
             );
@@ -523,135 +522,123 @@ class WorkspaceModel extends Signals.EventEmitter {
 
         const model = new WorkspaceModel({
             workArea: this.workArea,
-            focusedColumn: this.focusedColumn,
+            selected: this.selected,
             columns: this.columns.with(
-                this.focusedColumn,
+                this.selected,
                 new Column({
-                    focusedItem: currColumn.focusedItem + 1,
-                    items: [
-                        ...currColumn.items.slice(0, currColumn.focusedItem),
-                        currColumn.items[currColumn.focusedItem + 1],
-                        currColumn.items[currColumn.focusedItem],
-                        ...currColumn.items.slice(currColumn.focusedItem + 2),
+                    selected: currColumn.selected + 1,
+                    cells: [
+                        ...currColumn.cells.slice(0, currColumn.selected),
+                        currColumn.cells[currColumn.selected + 1],
+                        currColumn.cells[currColumn.selected],
+                        ...currColumn.cells.slice(currColumn.selected + 2),
                     ],
                 }),
             ),
         });
 
-        return model.relayout(currColumn.items[currColumn.focusedItem].value);
+        return model.relayout(currColumn.cells[currColumn.selected].value);
     }
 
     @decorateFnWithLog("log", "WorkspaceModel")
     moveFocusedItemLeft(): Result<WorkspaceModel> {
-        const fromColumn = this.columns[this.focusedColumn];
+        const fromColumn = this.columns[this.selected];
 
-        if (this.focusedColumn === 0 && fromColumn.items.length === 1) {
+        if (this.selected === 0 && fromColumn.cells.length === 1) {
             return Result.Err<WorkspaceModel>(
                 ModelChangeErrors.NO_MOVEMENT_POSSIBLE,
             );
         }
 
-        const maybeToColumn = this.columns[this.focusedColumn - 1];
+        const maybeToColumn = this.columns[this.selected - 1];
         const toColumn =
             maybeToColumn?.clone({
-                focusedItem: maybeToColumn.items.length,
-                items: [...maybeToColumn.items, fromColumn.getFocusedItem()],
+                selected: maybeToColumn.cells.length,
+                cells: [...maybeToColumn.cells, fromColumn.getSelectedCell()],
             }) ??
             new Column({
-                focusedItem: 0,
-                items: [fromColumn.getFocusedItem()],
+                selected: 0,
+                cells: [fromColumn.getSelectedCell()],
             });
 
-        const window = fromColumn.getFocusedItem().getFocusedWindow();
-        const focusedItemInNewFromColumn = Math.max(
-            0,
-            fromColumn.focusedItem - 1,
-        );
-        const newFocusedColumn = Math.max(0, this.focusedColumn - 1);
-        const fromColumnWasEmptied = fromColumn.items.length === 1;
+        const window = fromColumn.getSelectedCell().getSelectedWindow();
+        const seclectionInNewFromColumn = Math.max(0, fromColumn.selected - 1);
+        const newSelectedColIdx = Math.max(0, this.selected - 1);
+        const fromColumnWasEmptied = fromColumn.cells.length === 1;
         const newColumns =
             fromColumnWasEmptied ?
                 [
-                    ...this.columns.slice(0, newFocusedColumn),
+                    ...this.columns.slice(0, newSelectedColIdx),
                     toColumn,
-                    ...this.columns.slice(this.focusedColumn + 1),
+                    ...this.columns.slice(this.selected + 1),
                 ]
             :   [
-                    ...this.columns.slice(0, newFocusedColumn),
+                    ...this.columns.slice(0, newSelectedColIdx),
                     toColumn,
                     new Column({
-                        focusedItem: focusedItemInNewFromColumn,
-                        items: this.calculatePlacementOnCrossAxis(
-                            focusedItemInNewFromColumn,
-                            fromColumn.items.toSpliced(
-                                fromColumn.focusedItem,
-                                1,
-                            ),
+                        selected: seclectionInNewFromColumn,
+                        cells: this.calculatePlacementOnCrossAxis(
+                            seclectionInNewFromColumn,
+                            fromColumn.cells.toSpliced(fromColumn.selected, 1),
                             this.workArea,
                         ),
                     }),
-                    ...this.columns.slice(this.focusedColumn + 1),
+                    ...this.columns.slice(this.selected + 1),
                 ];
 
         return new WorkspaceModel({
             columns: newColumns,
-            focusedColumn: newFocusedColumn,
+            selected: newSelectedColIdx,
             workArea: this.workArea,
         }).relayout(window);
     }
 
     @decorateFnWithLog("log", "WorkspaceModel")
     moveFocusedItemRight(): Result<WorkspaceModel> {
-        const fromColumn = this.columns[this.focusedColumn];
+        const fromColumn = this.columns[this.selected];
 
         if (
-            this.focusedColumn === this.columns.length - 1 &&
-            fromColumn.items.length === 1
+            this.selected === this.columns.length - 1 &&
+            fromColumn.cells.length === 1
         ) {
             return Result.Err<WorkspaceModel>(
                 ModelChangeErrors.NO_MOVEMENT_POSSIBLE,
             );
         }
 
-        const maybeToColumn = this.columns[this.focusedColumn + 1];
+        const maybeToColumn = this.columns[this.selected + 1];
         const toColumn =
             maybeToColumn?.clone({
-                focusedItem: maybeToColumn.items.length,
-                items: [...maybeToColumn.items, fromColumn.getFocusedItem()],
+                selected: maybeToColumn.cells.length,
+                cells: [...maybeToColumn.cells, fromColumn.getSelectedCell()],
             }) ??
             new Column({
-                focusedItem: 0,
-                items: [fromColumn.items[fromColumn.focusedItem]],
+                selected: 0,
+                cells: [fromColumn.cells[fromColumn.selected]],
             });
 
-        const window = fromColumn.getFocusedItem().getFocusedWindow();
-        const focusedItemInNewFromColumn = Math.max(
-            0,
-            fromColumn.focusedItem - 1,
-        );
-        const fromColumnWasEmtpied = fromColumn.items.length === 1;
+        const window = fromColumn.getSelectedCell().getSelectedWindow();
+        const selectionInNewFromColumn = Math.max(0, fromColumn.selected - 1);
+        const fromColumnWasEmtpied = fromColumn.cells.length === 1;
         const newColumns =
             fromColumnWasEmtpied ?
                 [
-                    ...this.columns.slice(0, this.focusedColumn),
+                    ...this.columns.slice(0, this.selected),
                     toColumn,
-                    ...this.columns.slice(this.focusedColumn + 2),
+                    ...this.columns.slice(this.selected + 2),
                 ]
             :   [
-                    ...this.columns.slice(0, this.focusedColumn),
+                    ...this.columns.slice(0, this.selected),
                     new Column({
-                        focusedItem: focusedItemInNewFromColumn,
-                        items: this.calculatePlacementOnCrossAxis(
-                            focusedItemInNewFromColumn,
-                            fromColumn.items.toSpliced(
-                                fromColumn.focusedItem,
-                                1,
-                            ),
+                        selected: selectionInNewFromColumn,
+                        cells: this.calculatePlacementOnCrossAxis(
+                            selectionInNewFromColumn,
+                            fromColumn.cells.toSpliced(fromColumn.selected, 1),
                             this.workArea,
                         ),
                     }),
                     toColumn,
-                    ...this.columns.slice(this.focusedColumn + 2),
+                    ...this.columns.slice(this.selected + 2),
                 ];
 
         const addedANewColumn = newColumns.length > this.columns.length;
@@ -659,7 +646,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         return new WorkspaceModel({
             columns: newColumns,
             workArea: this.workArea,
-            focusedColumn: this.focusedColumn + (addedANewColumn ? 1 : 0),
+            selected: this.selected + (addedANewColumn ? 1 : 0),
         }).relayout(window);
     }
 
@@ -667,7 +654,7 @@ class WorkspaceModel extends Signals.EventEmitter {
     insertWindow(window: Meta.Window): Result<WorkspaceModel> {
         Debug.assert(
             this.columns.every(
-                (col) => col.items.every((item) => item.value !== window),
+                (col) => col.cells.every((c) => c.value !== window),
                 `Window (${window}) already in workspace`,
             ),
         );
@@ -683,7 +670,7 @@ class WorkspaceModel extends Signals.EventEmitter {
                 window,
                 mrus,
                 this.columns,
-                this.focusedColumn,
+                this.selected,
                 this.workArea,
             );
         } else if (openingPosition === WindowOpeningPosition.RIGHT) {
@@ -691,7 +678,7 @@ class WorkspaceModel extends Signals.EventEmitter {
                 window,
                 mrus,
                 this.columns,
-                this.focusedColumn,
+                this.selected,
                 this.workArea,
             );
         } else if (openingPosition === WindowOpeningPosition.BETWEEN_MRU) {
@@ -699,7 +686,7 @@ class WorkspaceModel extends Signals.EventEmitter {
                 window,
                 mrus,
                 this.columns,
-                this.focusedColumn,
+                this.selected,
                 this.workArea,
             );
         } else {
@@ -711,7 +698,7 @@ class WorkspaceModel extends Signals.EventEmitter {
 
         return new WorkspaceModel({
             workArea: this.workArea,
-            focusedColumn: -1, // will be set via relayout
+            selected: -1, // will be set via relayout
             columns: cols,
         }).relayout(window);
     }
@@ -721,7 +708,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         window: Meta.Window,
         newFocus: Meta.Window | null,
     ): Result<WorkspaceModel> {
-        if (this.columns.length === 1 && this.columns[0].items.length === 1) {
+        if (this.columns.length === 1 && this.columns[0].cells.length === 1) {
             this.destroy();
 
             return Result.Err<WorkspaceModel>(ModelChangeErrors.EMPTY_MODEL);
@@ -739,49 +726,49 @@ class WorkspaceModel extends Signals.EventEmitter {
             `Window not found in workspace: ${window}`,
         );
 
-        if (column.items.length === 1) {
+        if (column.cells.length === 1) {
             return new WorkspaceModel({
                 workArea: this.workArea,
-                focusedColumn: -1, // will be set via relayout
+                selected: -1, // will be set via relayout
                 columns: this.columns.filter((col) => col !== column),
             }).relayout(newFocus);
         }
 
-        const index = column.items.findIndex((item) => item.value === window);
-        const items = column.items.toSpliced(index, 1);
-        const focusedItem = Math.min(column.focusedItem, items.length - 1);
+        const index = column.cells.findIndex((c) => c.value === window);
+        const cells = column.cells.toSpliced(index, 1);
+        const selectedCell = Math.min(column.selected, cells.length - 1);
         const newColumn = new Column({
-            focusedItem: focusedItem,
-            items: this.calculatePlacementOnCrossAxis(
-                focusedItem,
-                items,
+            selected: selectedCell,
+            cells: this.calculatePlacementOnCrossAxis(
+                selectedCell,
+                cells,
                 this.workArea,
             ),
         });
 
         return new WorkspaceModel({
             workArea: this.workArea,
-            focusedColumn: -1, // will be set via relayout
+            selected: -1, // will be set via relayout
             columns: this.columns.with(this.columns.indexOf(column), newColumn),
         }).relayout(newFocus);
     }
 
     @decorateFnWithLog("log", "WorkspaceModel")
-    private findFocusedIndices(window: Meta.Window) {
+    private findSelectedIndices(window: Meta.Window) {
         const indices: {
-            focusedColumn: number | undefined;
-            focusedItem: number | undefined;
-        } = { focusedColumn: undefined, focusedItem: undefined };
+            selectedColumn: number | undefined;
+            selectedCell: number | undefined;
+        } = { selectedColumn: undefined, selectedCell: undefined };
 
         for (let colIndex = 0; colIndex < this.columns.length; colIndex++) {
             const column = this.columns[colIndex];
-            const itemIndex = column.items.findIndex((item) =>
-                item.contains(window),
+            const cellIndex = column.cells.findIndex((cell) =>
+                cell.contains(window),
             );
 
-            if (itemIndex !== -1) {
-                indices.focusedColumn = colIndex;
-                indices.focusedItem = itemIndex;
+            if (cellIndex !== -1) {
+                indices.selectedColumn = colIndex;
+                indices.selectedCell = cellIndex;
                 break;
             }
         }
@@ -790,12 +777,16 @@ class WorkspaceModel extends Signals.EventEmitter {
     }
 
     @decorateFnWithLog("log", "WorkspaceModel")
-    private calculateTotalWidth(columns: NonEmptyArray<Column>) {
-        return columns.reduce((acc, col) => acc + col.rect.width, 0);
+    private calculateTotalWidth<T extends { rect: Rect }>(
+        items: NonEmptyArray<T>,
+    ) {
+        return items.reduce((acc, col) => acc + col.rect.width, 0);
     }
 
     @decorateFnWithLog("log", "WorkspaceModel")
-    private calculateTotalHeight(items: NonEmptyArray<Item>) {
+    private calculateTotalHeight<T extends { rect: Rect }>(
+        items: NonEmptyArray<T>,
+    ) {
         return items.reduce((acc, item) => acc + item.rect.height, 0);
     }
 
@@ -821,9 +812,9 @@ class WorkspaceModel extends Signals.EventEmitter {
 
             resultCols.push(
                 new Column({
-                    focusedItem: col.focusedItem,
-                    items: col.items.map((item) => {
-                        return item.clone({
+                    selected: col.selected,
+                    cells: col.cells.map((cell) => {
+                        return cell.clone({
                             rect: { x: prevCol.rect.x + prevCol.rect.width },
                         });
                     }),
@@ -837,10 +828,10 @@ class WorkspaceModel extends Signals.EventEmitter {
 
             resultCols.unshift(
                 new Column({
-                    focusedItem: col.focusedItem,
-                    items: col.items.map((item) => {
-                        return item.clone({
-                            rect: { x: nextCol.rect.x - item.rect.width },
+                    selected: col.selected,
+                    cells: col.cells.map((cell) => {
+                        return cell.clone({
+                            rect: { x: nextCol.rect.x - cell.rect.width },
                         });
                     }),
                 }),
@@ -851,59 +842,63 @@ class WorkspaceModel extends Signals.EventEmitter {
     }
 
     @decorateFnWithLog("log", "WorkspaceModel")
-    private alignItems(
-        newFocusIndex: number,
-        items: NonEmptyArray<Item>,
-        resultItems: NonEmptyArray<Item>,
+    private alignCells(
+        newSelectedIndex: number,
+        cells: NonEmptyArray<Cell>,
+        result: NonEmptyArray<Cell>,
     ) {
         Debug.assert(
-            items[newFocusIndex].equals(resultItems[0]),
-            "Provided item is not the item to align to",
+            cells[newSelectedIndex].equals(result[0]),
+            "Provided cell is not the cell to align to",
         );
 
         Debug.assert(
-            resultItems.length === 1,
-            "No item that other items should be aligned to was provided",
+            result.length === 1,
+            "No cell that other cells should be aligned to was provided",
         );
 
-        for (let i = newFocusIndex + 1; i < items.length; i++) {
-            const item = items[i];
-            const prevItem = resultItems.at(-1) as Item;
+        for (let i = newSelectedIndex + 1; i < cells.length; i++) {
+            const cell = cells[i];
+            const prevCell = result.at(-1) as Cell;
 
-            resultItems.push(
-                item.clone({
-                    rect: { y: prevItem.rect.y + prevItem.rect.height },
+            result.push(
+                cell.clone({
+                    rect: { y: prevCell.rect.y + prevCell.rect.height },
                 }),
             );
         }
 
-        for (let i = newFocusIndex - 1; i >= 0; i--) {
-            const item = items[i];
-            const nextItem = resultItems[0];
+        for (let i = newSelectedIndex - 1; i >= 0; i--) {
+            const cell = cells[i];
+            const nextCell = result[0];
 
-            resultItems.unshift(
-                item.clone({
-                    rect: { y: nextItem.rect.y - item.rect.height },
+            result.unshift(
+                cell.clone({
+                    rect: { y: nextCell.rect.y - cell.rect.height },
                 }),
             );
         }
 
-        return resultItems;
+        return result;
     }
 
     @decorateFnWithLog("log", "WorkspaceModel")
     private calculatePlacementOnMainAxis(
-        newFocusColumn: number,
+        newSelectedColIndex: number,
         columns: NonEmptyArray<Column>,
         workspace: Rect,
     ) {
         const focusBehaviorMainAxis = Settings.getFocusBehaviorMainAxis();
 
         if (focusBehaviorMainAxis === FocusBehavior.CENTER) {
-            return this.centerOnMainAxis(newFocusColumn, columns, workspace);
+            return this.centerOnMainAxis(
+                newSelectedColIndex,
+                columns,
+                workspace,
+            );
         } else if (focusBehaviorMainAxis === FocusBehavior.LAZY_FOLLOW) {
             return this.lazyFollowOnMainAxis(
-                newFocusColumn,
+                newSelectedColIndex,
                 columns,
                 workspace,
             );
@@ -916,16 +911,20 @@ class WorkspaceModel extends Signals.EventEmitter {
 
     @decorateFnWithLog("log", "WorkspaceModel")
     private calculatePlacementOnCrossAxis(
-        newFocusItem: number,
-        items: NonEmptyArray<Item>,
+        newSelectedCellIdx: number,
+        cells: NonEmptyArray<Cell>,
         workspace: Rect,
     ) {
         const focusBehaviorCrossAxis = Settings.getFocusBehaviorCrossAxis();
 
         if (focusBehaviorCrossAxis === FocusBehavior.CENTER) {
-            return this.centerOnCrossAxis(newFocusItem, items, workspace);
+            return this.centerOnCrossAxis(newSelectedCellIdx, cells, workspace);
         } else if (focusBehaviorCrossAxis === FocusBehavior.LAZY_FOLLOW) {
-            return this.lazyFollowOnCrossAxis(newFocusItem, items, workspace);
+            return this.lazyFollowOnCrossAxis(
+                newSelectedCellIdx,
+                cells,
+                workspace,
+            );
         }
 
         throw new Error(
@@ -935,19 +934,19 @@ class WorkspaceModel extends Signals.EventEmitter {
 
     @decorateFnWithLog("log", "WorkspaceModel")
     private centerOnMainAxis(
-        newFocusIndex: number,
+        newSelectedIndex: number,
         columns: NonEmptyArray<Column>,
         workspace: Rect,
     ) {
-        const selectedCol = columns[newFocusIndex];
+        const selectedCol = columns[newSelectedIndex];
         const resultCols = [
             new Column({
-                focusedItem: selectedCol.focusedItem,
-                items: selectedCol.items.map((item) => {
-                    return item.clone({
+                selected: selectedCol.selected,
+                cells: selectedCol.cells.map((cell) => {
+                    return cell.clone({
                         rect: {
                             x: Math.floor(
-                                workspace.width / 2 - item.rect.width / 2,
+                                workspace.width / 2 - cell.rect.width / 2,
                             ),
                         },
                     });
@@ -955,37 +954,37 @@ class WorkspaceModel extends Signals.EventEmitter {
             }),
         ];
 
-        return this.alignColumns(newFocusIndex, columns, resultCols);
+        return this.alignColumns(newSelectedIndex, columns, resultCols);
     }
 
     @decorateFnWithLog("log", "WorkspaceModel")
     private centerOnCrossAxis(
-        newFocusIndex: number,
-        items: NonEmptyArray<Item>,
+        newSelectedIndex: number,
+        cells: NonEmptyArray<Cell>,
         workspace: Rect,
     ) {
-        const selectedItem = items[newFocusIndex];
-        const resultItems = [
-            selectedItem.clone({
+        const selectedCell = cells[newSelectedIndex];
+        const resultCells = [
+            selectedCell.clone({
                 rect: {
                     y: Math.floor(
-                        workspace.height / 2 - selectedItem.rect.height / 2,
+                        workspace.height / 2 - selectedCell.rect.height / 2,
                     ),
                 },
             }),
         ];
 
-        return this.alignItems(newFocusIndex, items, resultItems);
+        return this.alignCells(newSelectedIndex, cells, resultCells);
     }
 
     @decorateFnWithLog("log", "WorkspaceModel")
     private lazyFollowOnMainAxis(
-        newFocusColumn: number,
+        newSelectedColumn: number,
         columns: NonEmptyArray<Column>,
         workspace: Rect,
     ) {
         const mrus = WorkspaceModelManager.getWindows();
-        const visibleColumns = [columns[newFocusColumn]];
+        const visibleColumns = [columns[newSelectedColumn]];
 
         while (true) {
             const leftMostVisibleCol = visibleColumns[0];
@@ -1001,13 +1000,13 @@ class WorkspaceModel extends Signals.EventEmitter {
             ) {
                 const mruPositionOfLeftNeighbor = mrus.indexOf(
                     maybeLeftNeighborOfVisible
-                        .getFocusedItem()
-                        .getFocusedWindow(),
+                        .getSelectedCell()
+                        .getSelectedWindow(),
                 );
                 const mruPositionOfRightNeighbor = mrus.indexOf(
                     maybeRightNeighborOfVisible
-                        .getFocusedItem()
-                        .getFocusedWindow(),
+                        .getSelectedCell()
+                        .getSelectedWindow(),
                 );
 
                 if (mruPositionOfLeftNeighbor < mruPositionOfRightNeighbor) {
@@ -1073,9 +1072,9 @@ class WorkspaceModel extends Signals.EventEmitter {
         const totalWidth = this.calculateTotalWidth(columns);
         const [firstCol] = columns;
         const placedFirstCol = new Column({
-            focusedItem: firstCol.focusedItem,
-            items: firstCol.items.map((item) => {
-                return item.clone({
+            selected: firstCol.selected,
+            cells: firstCol.cells.map((cell) => {
+                return cell.clone({
                     rect: {
                         x: Math.floor(workspace.width / 2 - totalWidth / 2),
                     },
@@ -1096,13 +1095,13 @@ class WorkspaceModel extends Signals.EventEmitter {
         const peekingAmount =
             windowsOffscreenOnLeft ? Settings.getWindowPeeking() : 0;
         const placedCol = new Column({
-            focusedItem: leftMostFullyVisColumn.focusedItem,
-            items: leftMostFullyVisColumn.items.map((item) => {
-                return item.clone({
+            selected: leftMostFullyVisColumn.selected,
+            cells: leftMostFullyVisColumn.cells.map((cell) => {
+                return cell.clone({
                     rect: {
                         x:
                             leftMostFullyVisColumn.rect.width -
-                            item.rect.width +
+                            cell.rect.width +
                             peekingAmount,
                     },
                 });
@@ -1123,9 +1122,9 @@ class WorkspaceModel extends Signals.EventEmitter {
         const peekingAmount =
             windowsOffscreenOnRight ? Settings.getWindowPeeking() : 0;
         const placedCol = new Column({
-            focusedItem: rightMostFullyVisColumn.focusedItem,
-            items: rightMostFullyVisColumn.items.map((item) => {
-                return item.clone({
+            selected: rightMostFullyVisColumn.selected,
+            cells: rightMostFullyVisColumn.cells.map((cell) => {
+                return cell.clone({
                     rect: {
                         x:
                             workspace.width -
@@ -1141,124 +1140,124 @@ class WorkspaceModel extends Signals.EventEmitter {
 
     @decorateFnWithLog("log", "WorkspaceModel")
     private lazyFollowOnCrossAxis(
-        newFocusItem: number,
-        items: NonEmptyArray<Item>,
+        newSelectedCellIdx: number,
+        cells: NonEmptyArray<Cell>,
         workspace: Rect,
     ) {
         const mrus = WorkspaceModelManager.getWindows();
-        const visibleItems = [items[newFocusItem]];
+        const visibleCells = [cells[newSelectedCellIdx]];
 
         while (true) {
-            const topMostVisibleItem = visibleItems[0];
-            const bottomMostVisibleItem = visibleItems.at(-1) as Item;
-            const aboveIndex = items.indexOf(topMostVisibleItem) - 1;
-            const maybeAboveNeighborOfVisible = items[aboveIndex];
-            const belowIndex = items.indexOf(bottomMostVisibleItem) + 1;
-            const maybeBottomNeighborOfVisible = items[belowIndex];
+            const topMostVisibleCell = visibleCells[0];
+            const bottomMostVisibleCell = visibleCells.at(-1) as Cell;
+            const aboveIndex = cells.indexOf(topMostVisibleCell) - 1;
+            const maybeAboveNeighborOfVisible = cells[aboveIndex];
+            const belowIndex = cells.indexOf(bottomMostVisibleCell) + 1;
+            const maybeBottomNeighborOfVisible = cells[belowIndex];
 
             if (
                 maybeAboveNeighborOfVisible !== undefined &&
                 maybeBottomNeighborOfVisible !== undefined
             ) {
                 const mruPositionOfLeftNeighbor = mrus.indexOf(
-                    maybeAboveNeighborOfVisible.getFocusedWindow(),
+                    maybeAboveNeighborOfVisible.getSelectedWindow(),
                 );
                 const mruPositionOfRightNeighbor = mrus.indexOf(
-                    maybeBottomNeighborOfVisible.getFocusedWindow(),
+                    maybeBottomNeighborOfVisible.getSelectedWindow(),
                 );
 
                 if (mruPositionOfLeftNeighbor < mruPositionOfRightNeighbor) {
-                    visibleItems.unshift(maybeAboveNeighborOfVisible);
+                    visibleCells.unshift(maybeAboveNeighborOfVisible);
 
                     if (
-                        this.calculateTotalHeight(visibleItems) >
+                        this.calculateTotalHeight(visibleCells) >
                         workspace.height
                     ) {
-                        return this.alignToBottomMostItemForLazyFollowOnCrossAxis(
-                            visibleItems.at(-1) as Item,
-                            items,
+                        return this.alignToBottomMostCellForLazyFollowOnCrossAxis(
+                            visibleCells.at(-1) as Cell,
+                            cells,
                             workspace,
                         );
                     }
                 } else {
-                    visibleItems.push(maybeBottomNeighborOfVisible);
+                    visibleCells.push(maybeBottomNeighborOfVisible);
 
                     if (
-                        this.calculateTotalHeight(visibleItems) >
+                        this.calculateTotalHeight(visibleCells) >
                         workspace.height
                     ) {
-                        return this.alignToTopMostItemForLazyFollowOnCrossAxis(
-                            visibleItems[0],
-                            items,
+                        return this.alignToTopMostCellForLazyFollowOnCrossAxis(
+                            visibleCells[0],
+                            cells,
                         );
                     }
                 }
             } else if (maybeAboveNeighborOfVisible !== undefined) {
-                visibleItems.unshift(maybeAboveNeighborOfVisible);
+                visibleCells.unshift(maybeAboveNeighborOfVisible);
 
                 if (
-                    this.calculateTotalHeight(visibleItems) > workspace.height
+                    this.calculateTotalHeight(visibleCells) > workspace.height
                 ) {
-                    return this.alignToBottomMostItemForLazyFollowOnCrossAxis(
-                        visibleItems.at(-1) as Item,
-                        items,
+                    return this.alignToBottomMostCellForLazyFollowOnCrossAxis(
+                        visibleCells.at(-1) as Cell,
+                        cells,
                         workspace,
                     );
                 }
             } else if (maybeBottomNeighborOfVisible !== undefined) {
-                visibleItems.push(maybeBottomNeighborOfVisible);
+                visibleCells.push(maybeBottomNeighborOfVisible);
 
                 if (
-                    this.calculateTotalHeight(visibleItems) > workspace.height
+                    this.calculateTotalHeight(visibleCells) > workspace.height
                 ) {
-                    return this.alignToTopMostItemForLazyFollowOnCrossAxis(
-                        visibleItems[0],
-                        items,
+                    return this.alignToTopMostCellForLazyFollowOnCrossAxis(
+                        visibleCells[0],
+                        cells,
                     );
                 }
             } else {
-                return this.centerAllItemsOnCrossAxis(items, workspace);
+                return this.centerAllCellsOnCrossAxis(cells, workspace);
             }
         }
     }
 
     @decorateFnWithLog("log", "WorkspaceModel")
-    private alignToTopMostItemForLazyFollowOnCrossAxis(
-        topMostItem: Item,
-        items: NonEmptyArray<Item>,
+    private alignToTopMostCellForLazyFollowOnCrossAxis(
+        topMostCell: Cell,
+        cells: NonEmptyArray<Cell>,
     ) {
-        const topMostIndex = items.indexOf(topMostItem);
-        const placedItem = topMostItem.clone({ rect: { y: 0 } });
+        const topMostIndex = cells.indexOf(topMostCell);
+        const placedCell = topMostCell.clone({ rect: { y: 0 } });
 
-        return this.alignItems(topMostIndex, items, [placedItem]);
+        return this.alignCells(topMostIndex, cells, [placedCell]);
     }
 
     @decorateFnWithLog("log", "WorkspaceModel")
-    private alignToBottomMostItemForLazyFollowOnCrossAxis(
-        bottomMostItem: Item,
-        items: NonEmptyArray<Item>,
+    private alignToBottomMostCellForLazyFollowOnCrossAxis(
+        bottomMostCell: Cell,
+        cells: NonEmptyArray<Cell>,
         workspace: Rect,
     ) {
-        const bottomMostIndex = items.indexOf(bottomMostItem);
-        const placedItem = bottomMostItem.clone({
-            rect: { y: workspace.height - bottomMostItem.rect.height },
+        const bottomMostIndex = cells.indexOf(bottomMostCell);
+        const placedCell = bottomMostCell.clone({
+            rect: { y: workspace.height - bottomMostCell.rect.height },
         });
 
-        return this.alignItems(bottomMostIndex, items, [placedItem]);
+        return this.alignCells(bottomMostIndex, cells, [placedCell]);
     }
 
     @decorateFnWithLog("log", "WorkspaceModel")
-    private centerAllItemsOnCrossAxis(
-        items: NonEmptyArray<Item>,
+    private centerAllCellsOnCrossAxis(
+        cells: NonEmptyArray<Cell>,
         workspace: Rect,
     ) {
-        const totalHeight = this.calculateTotalHeight(items);
-        const [firstItem] = items;
-        const placedFirstItem = firstItem.clone({
+        const totalHeight = this.calculateTotalHeight(cells);
+        const [firstCell] = cells;
+        const placedFirstCell = firstCell.clone({
             rect: { y: Math.floor(workspace.height / 2 - totalHeight / 2) },
         });
 
-        return this.alignItems(0, items, [placedFirstItem]);
+        return this.alignCells(0, cells, [placedFirstCell]);
     }
 
     @decorateFnWithLog("log", "WorkspaceModel")
@@ -1266,7 +1265,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         window: Meta.Window,
         mrus: Meta.Window[],
         columns: NonEmptyArray<Column>,
-        focusedColumn: number,
+        selected: number,
         workspace: Rect,
     ) {
         const windowFrame = window.get_frame_rect();
@@ -1275,9 +1274,9 @@ class WorkspaceModel extends Signals.EventEmitter {
             prevFocusedWindow &&
             columns.find((col) => col.contains(prevFocusedWindow));
         const newColumn = new Column({
-            focusedItem: 0,
-            items: [
-                new Item({
+            selected: 0,
+            cells: [
+                new Cell({
                     value: window,
                     rect: {
                         x: prevCol ? prevCol.rect.x - windowFrame.width : 0,
@@ -1292,9 +1291,9 @@ class WorkspaceModel extends Signals.EventEmitter {
         });
 
         return [
-            ...columns.slice(0, focusedColumn),
+            ...columns.slice(0, selected),
             newColumn,
-            ...columns.slice(focusedColumn),
+            ...columns.slice(selected),
         ];
     }
 
@@ -1303,7 +1302,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         window: Meta.Window,
         mrus: Meta.Window[],
         columns: NonEmptyArray<Column>,
-        focusedColumn: number,
+        selected: number,
         workspace: Rect,
     ) {
         const windowFrame = window.get_frame_rect();
@@ -1312,9 +1311,9 @@ class WorkspaceModel extends Signals.EventEmitter {
             prevFocusedWindow &&
             columns.find((col) => col.contains(prevFocusedWindow));
         const newColumn = new Column({
-            focusedItem: 0,
-            items: [
-                new Item({
+            selected: 0,
+            cells: [
+                new Cell({
                     value: window,
                     rect: {
                         x: prevCol ? prevCol.rect.x + windowFrame.width : 0,
@@ -1329,9 +1328,9 @@ class WorkspaceModel extends Signals.EventEmitter {
         });
 
         return [
-            ...columns.slice(0, focusedColumn + 1),
+            ...columns.slice(0, selected + 1),
             newColumn,
-            ...columns.slice(focusedColumn + 1),
+            ...columns.slice(selected + 1),
         ];
     }
 
@@ -1340,7 +1339,7 @@ class WorkspaceModel extends Signals.EventEmitter {
         window: Meta.Window,
         mrus: Meta.Window[],
         columns: NonEmptyArray<Column>,
-        focusedColumn: number,
+        selected: number,
         workspace: Rect,
     ) {
         const [prevFocusedWindow, prevPrevFocusedWindow] = mrus;
@@ -1350,7 +1349,7 @@ class WorkspaceModel extends Signals.EventEmitter {
                 window,
                 mrus,
                 columns,
-                focusedColumn,
+                selected,
                 workspace,
             );
         }
@@ -1372,7 +1371,7 @@ class WorkspaceModel extends Signals.EventEmitter {
                 window,
                 mrus,
                 columns,
-                focusedColumn,
+                selected,
                 workspace,
             );
         } else {
@@ -1380,7 +1379,7 @@ class WorkspaceModel extends Signals.EventEmitter {
                 window,
                 mrus,
                 columns,
-                focusedColumn,
+                selected,
                 workspace,
             );
         }
@@ -1394,7 +1393,7 @@ let TestEnv;
 if (globalThis.process?.env.NODE_ENV === "test") {
     TestEnv = {
         Column,
-        Item,
+        Cell,
         WindowOpeningPosition,
     };
 }

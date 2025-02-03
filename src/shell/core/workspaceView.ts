@@ -64,7 +64,7 @@ class WorkspaceView {
             fn: () => {
                 const grid = model.getGrid();
 
-                grid.items.forEach((col) => {
+                grid.cells.forEach((col) => {
                     col.forEach((item) => item.sync());
                 });
 
