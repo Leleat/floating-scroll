@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface domain="floating-scroll@extensions.leleat">
+  <object class="AdwPreferencesPage" id="placement">
+    <property name="title" translatable="yes">Placement</property>
+    <property name="icon-name">view-app-grid-symbolic</property>
+    <child>
+      <object class="AdwPreferencesGroup">
+        <child>
+          <object class="AdwComboRow" id="window-opening-position">
+            <property name="title" translatable="yes" comments="">Window Opening Position</property>
+            <property name="model">
+              <object class="GtkStringList">
+                <items>
+                  <item translatable="yes" comments="">Left</item>
+                  <item translatable="yes" comments="">Right</item>
+                  <item translatable="yes" comments="">Between MRU Windows</item>
+                </items>
+              </object>
+            </property>
+          </object>
+        </child>
+      </object>
+    </child>
+    <child>
+      <object class="AdwPreferencesGroup">
+        <child>
+          <object class="AdwSpinRow" id="window-padding">
+            <property name="title" translatable="yes" comments="">Window Padding</property>
+            <property name="activatable-widget">window-padding</property>
+            <property name="adjustment">
+              <object class="GtkAdjustment">
+                <property name="upper">100</property>
+                <property name="step-increment">1</property>
+                <property name="page-increment">10</property>
+              </object>
+            </property>
+          </object>
+        </child>
+        <child>
+          <object class="AdwSpinRow" id="window-peeking">
+            <property name="title" translatable="yes" comments="">Window Peeking</property>
+            <property name="activatable-widget">window-peeking</property>
+            <property name="adjustment">
+              <object class="GtkAdjustment">
+                <property name="upper">100</property>
+                <property name="step-increment">1</property>
+                <property name="page-increment">10</property>
+              </object>
+            </property>
+          </object>
+        </child>
+      </object>
+    </child>
+  </object>
+</interface>

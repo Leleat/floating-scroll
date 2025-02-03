@@ -247,6 +247,14 @@ class Settings {
         ) as WindowOpeningPosition;
     }
 
+    getWindowPadding() {
+        return this.gioObject.get_int("window-padding");
+    }
+
+    getWindowPeeking() {
+        return this.gioObject.get_int("window-peeking");
+    }
+
     /***************************************************************************
      * Setters *****************************************************************
      **************************************************************************/

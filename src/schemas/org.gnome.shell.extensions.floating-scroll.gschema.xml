@@ -34,6 +34,14 @@
             <default>'left'</default>
             <summary>Initial position when opening a window</summary>
         </key>
+        <key name="window-peeking" type="i">
+            <default>20</default>
+            <summary>Amount of windows peeking in at the screen edge when using the lazy follow focus mode</summary>
+        </key>
+        <key name="window-padding" type="i">
+            <default>16</default>
+            <summary>Padding between item container and window</summary>
+        </key>
 
         <!--                  -->
         <!--    Shortcuts     -->
@@ -100,7 +108,7 @@
         </key>
 
         <key name="debug-level" enum="org.gnome.shell.extensions.floating-scroll.debug-level">
-            <default>'error'</default>
+            <default>'debug'</default>
             <summary>Private key: Determines the debug level</summary>
         </key>
 

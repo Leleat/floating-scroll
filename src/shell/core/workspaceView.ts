@@ -1,8 +1,12 @@
 import { GLib } from "../dependencies.js";
-import { Debug } from "../utils/debug.js";
+import { Debug, decorateFnWithLog } from "../utils/debug.js";
 
 import { Timeouts } from "../utils/timeouts.js";
-import { type Event, EventGenerator, EventProcessor } from "./eventSystem.js";
+import {
+    type WorkspaceChangeEvent,
+    EventGenerator,
+    EventProcessor,
+} from "./eventSystem.js";
 import { WorkspaceModel } from "./workspaceModel.js";
 import { WorkspaceModelManager } from "./workspaceModelManager.js";
 
@@ -25,6 +29,7 @@ class WorkspaceView {
         this.eventGenerator.sub(this, (e) => this.onEvent(e));
     }
 
+    @decorateFnWithLog("log", "WorkspaceView")
     destroy() {
         this.eventGenerator.destroy();
         this.eventGenerator = null!;
@@ -33,19 +38,22 @@ class WorkspaceView {
         this.eventProcessor = null!;
     }
 
-    private onEvent(event: Event) {
+    @decorateFnWithLog("log", "WorkspaceView", { color: "Cyan" })
+    private onEvent(event: WorkspaceChangeEvent) {
         this.eventProcessor
             .processEvent(event)
-            .inspect((model) => {
-                WorkspaceModelManager.setActiveWorkspaceModel(model);
+            .inspect((event) => {
+                const model = event.getModel() as WorkspaceModel;
 
+                WorkspaceModelManager.setWorkspaceModel(model);
                 this.update(model);
             })
-            .inspectErr((e) => {
-                Debug.log(e);
+            .inspectErr((err) => {
+                Debug.log(err);
             });
     }
 
+    @decorateFnWithLog("log", "WorkspaceView")
     private update(model: WorkspaceModel) {
         // TODO Just quick hack to not redo the updates for all events since
         // TODO many "focus-change" events are sent, for instance, when opening
@@ -56,7 +64,7 @@ class WorkspaceView {
             fn: () => {
                 const grid = model.getGrid();
 
-                grid.items.forEach((col) => {
+                grid.cells.forEach((col) => {
                     col.forEach((item) => item.sync());
                 });
 

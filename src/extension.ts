@@ -36,7 +36,7 @@ export default class FloatingScroll extends Extension {
         enableSettings();
         enableShortcuts();
         enableInjections();
-        enableDebugModule(Settings);
+        enableDebugModule(Settings, "[floating-scroll]");
         enableOverrides();
         enableCoreModules();
     }
