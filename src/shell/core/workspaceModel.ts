@@ -116,9 +116,9 @@ class Cell {
             this.value.move_resize_frame(
                 true,
                 workArea.x + this.rect.x + this.padding / 2,
-                workArea.y + this.rect.y,
+                workArea.y + this.rect.y + this.padding / 2,
                 this.rect.width - this.padding,
-                this.rect.height,
+                this.rect.height - this.padding,
             );
         }
     }
@@ -1227,7 +1227,12 @@ class WorkspaceModel extends Signals.EventEmitter {
         cells: NonEmptyArray<Cell>,
     ) {
         const topMostIndex = cells.indexOf(topMostCell);
-        const placedCell = topMostCell.clone({ rect: { y: 0 } });
+        const windowsOffscreenOnLeft = topMostIndex > 0;
+        const peekingAmount =
+            windowsOffscreenOnLeft ? Settings.getWindowPeeking() : 0;
+        const placedCell = topMostCell.clone({
+            rect: { y: 0 + peekingAmount },
+        });
 
         return this.alignCells(topMostIndex, cells, [placedCell]);
     }
@@ -1239,8 +1244,16 @@ class WorkspaceModel extends Signals.EventEmitter {
         workspace: Rect,
     ) {
         const bottomMostIndex = cells.indexOf(bottomMostCell);
+        const windowsOffscreenOnRight = bottomMostIndex < cells.length - 1;
+        const peekingAmount =
+            windowsOffscreenOnRight ? Settings.getWindowPeeking() : 0;
         const placedCell = bottomMostCell.clone({
-            rect: { y: workspace.height - bottomMostCell.rect.height },
+            rect: {
+                y:
+                    workspace.height -
+                    bottomMostCell.rect.height -
+                    peekingAmount,
+            },
         });
 
         return this.alignCells(bottomMostIndex, cells, [placedCell]);
